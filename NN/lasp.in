@@ -1,0 +1,22 @@
+#
+Ntrain 2
+explore_type train
+# Input of training
+#
+Jobname      H2O
+Ntest        0
+NNepochs  28000
+Ewaldflag    0  
+readScale    0 #decide read Gmin/Gmax
+readSympara  0  # decide read w,b
+OutpotFreq   100
+#fixtrainatm  0-200
+
+#
+# Specify network information
+#
+%block netinfo
+ H  H2O.input
+ O  H2O.input
+%endblock netinfo
+#

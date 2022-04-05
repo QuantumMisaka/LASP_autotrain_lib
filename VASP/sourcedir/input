@@ -1,0 +1,11 @@
+SSW.printdelay  -1
+SSW.printselect 1
+SSW.printevery T
+potential vasp
+
+explore_type ssw
+
+Run_type  15
+SSW.SSWsteps             0
+SSW.internal_LJ  F
+
