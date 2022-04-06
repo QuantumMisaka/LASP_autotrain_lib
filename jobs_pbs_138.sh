@@ -27,7 +27,7 @@ if [ ! -f ~/.mpd.conf ]; then
 /bin/chmod 600 ~/.mpd.conf
 fi
 
-NSLOTS = `cat $PBS_NODEFILE | wc -l`
+NP= `cat $PBS_NODEFILE | wc -l`
 echo "Numbers of Processors:;  $NP"
 echo "----------------------------"
 echo `date`
@@ -44,7 +44,7 @@ echo "Job Starting at `date`" >> JobRunning
 
 ROOTDIR= $PBS_O_WORKDIR
 
-for i in {1..100}
+for((i=1;i<=$MAXCYCLE;i++))
 do
 # SSW-NN and VASP-DFT running
 
@@ -70,13 +70,13 @@ echo --- Start NN Training ---
 echo `date`
 Ntotal=$( grep Energy TrainStr.txt -c )
 echo 'Num of Str/For Training data is:'
-echo Ntotal
+echo $Ntotal
 sed -i '/^NNtrain/d' lasp.in
 sed -i '/^Ntrain/d' lasp.in
 sed -i '1a \Ntrain '$Ntotal lasp.in
 
 # running NN training
-mpirun -r ssh -np $NSLOTS $EXEC 2>&1 > output
+mpirun -r ssh -np $NP $EXEC 2>&1 > output
 
 sleep 20
 # input is pot-format tmp file?
