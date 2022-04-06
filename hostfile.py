@@ -194,11 +194,11 @@ def runprog_cluster_manual(workdir,prog,hostInfo,ncpus,rootdir,env,poolcount =0,
         #mpiprog = "mpirun -machinefile %s -env I_MPI_DEVICE rdma:OpenIB-cma -np %d "%(node_path, ncpus) + prog
 #        mpiprog = "source /home2/shang/.bashrc; mpirun -machinefile %s -np %d "%(node_path, ncpus) + prog
         
-        # mpiprog = " mpirun  -rsh=ssh -machinefile %s -np %d "%(node_path, ncpus) + prog # in ZPLiu Group
-        mpiprog = " mpirun  -rsh=ssh -np %d "%(ncpus) + prog # in CCC-ECUST 138
+        mpiprog = " mpirun  -rsh=ssh -machinefile %s -np %d "%(node_path, ncpus) + prog # in ZPLiu Group
         # main running code including mpirun
         # key parameter: -machinefile, linked to nodeInfo and hostInfo
         # -machinefile for node indicating
+        # mpiprog = " mpirun  -rsh=ssh -np %d "%(ncpus) + prog # in CCC-ECUST 138
 #       
         fout1 = open("proginfo","w")
         fout1.write("Current process: "+ multiprocessing.current_process().name +"\n")

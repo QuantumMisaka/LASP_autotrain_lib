@@ -546,7 +546,7 @@ class RunVASP:
         for i in range(nstr):
             if glob.glob('para%d/OSZICAR'%(i+1)):
                 icontrol= int(os.popen('cat para%d/OSZICAR | wc -l'%(i+1)).readline().strip())
-                if(icontrol < 100): # why
+                if(icontrol < 100): # if DFT-single end properly
                     os.system('cat para%d/allstr.arc >> 1.arc'%(i+1))
                     os.system('cat para%d/allfor.arc >> 2.arc'%(i+1))
         return
@@ -567,6 +567,7 @@ class RunVASP:
             AllStr.arcinit([0,0],strfile)
         # Here can set HighE,MaxAngle,MinAngle
         if len(AllStr)==0: return
+        # for screen structure/force data
         b=BadStr()
         #   b.HighE=-3.0
         b.MaxFor = self.maxF
@@ -575,6 +576,7 @@ class RunVASP:
         #
         AllStr = AllStr.filter(b)
 
+        # main filter function use allstr_new.py and structure_new.py
         if(len(AllStr) > nmax+50):
             AllStr.random_arange(200)
             AllStr = AllStr_new(AllStr[:(nmax+50)])

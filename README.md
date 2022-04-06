@@ -9,6 +9,14 @@ Last Change: 2022-04-05
 
 Version: V1.0
 
+## Program Structure
+
+
+
+![auto_dependance](image/auto_dependance.png)
+
+![auto_workflow](image/auto_workflow.png)
+
 ## How to run it directly
 
 ### 1. modify console file

@@ -10,15 +10,12 @@ source /data/intel-env/intel15u6.sh
 
 EXEC=/home/apps/LASP/lasp
 export LD_LIBRARY_PATH=/home/apps/LASP/INTER_pro3.2.0_intel12_2cw/Libraries/1.vasplib
-source /home/james/app_envs/lasp_env.sh
 EXEC=/home/james/apps/LASP/lasp_NN
-# PYTHONEXEC=/home/james/apps/anaconda3/bin/python
 export PYTHONPATH=/home/james/apps/anaconda3/bin:$PYTHONPATH
 alias python=/home/james/apps/anaconda3/bin/python
 
 POTNAME=H2O
-MAXCYCLE=100 # I want to use it
-
+MAXCYCLE=100
 
 # go to workdir
 cd $PBS_O_WORKDIR
@@ -47,7 +44,6 @@ ROOTDIR= $PBS_O_WORKDIR
 for((i=1;i<=$MAXCYCLE;i++))
 do
 # SSW-NN and VASP-DFT running
-
 printf " Start SSW-DFT-NN Cycle %d\n" $i 
 echo `date`
 
@@ -81,11 +77,11 @@ mpirun -r ssh -np $NP $EXEC 2>&1 > output
 sleep 20
 # input is pot-format tmp file?
 # should modify pot-name here
-sed -i 's/newrun/${POTNAME}.input/g' ${POTNAME}.pot
+sed -i 's/newrun/'"${POTNAME}"'.input/g' ${POTNAME}.pot
 cp ${POTNAME}.pot ${POTNAME}.pot-$i
 cp ${POTNAME}.pot ${POTNAME}.input
 cp lasp.out lasp.out-$i
-cd $ROOTDIR
+cd $PBS_O_WORKDIR
 
 printf " End SSW-DFT-NN Cycle %d\n" $i
 echo `date`

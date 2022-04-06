@@ -46,7 +46,7 @@ mpirun -rsh=ssh -np $NSLOTS $PEXEC > output
 
 sleep 20
 # input is pot-format tmp file?
-sed -i 's/newrun/${POTNAME}.input/g' ${POTNAME}.pot
+sed -i 's/newrun/'"${POTNAME}"'.input/g' ${POTNAME}.pot
 cp ${POTNAME}.pot ${POTNAME}.pot-$i
 cp ${POTNAME}.pot ${POTNAME}.input
 cd $ROOTDIR
