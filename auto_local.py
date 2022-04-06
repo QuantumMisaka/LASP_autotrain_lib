@@ -1,7 +1,7 @@
 #! /usr/bin/env  python
 # noted by JamesBourbon: run on local-node
 # many differences from original auto.py
-# last change in 20220405, V1.0-testing
+# last change in 20220406, V1.0-testing
 # running properly in Ubuntu
 # should take care of Pool(process=poolsize)
 # Dependence: allstr_new.py structure_new.py atom_k.py hostfile.py nodejob.py PeriodicTable.py
@@ -416,7 +416,7 @@ class RunVASP:
                 self.prog=para['prog']['VASPgamma']
             else:
                 AllStr[i].genKPOINTS('KPOINTS')
-            os.system('mv KPOINTS para%d/'%(i+1))
+                os.system('mv KPOINTS para%d/'%(i+1))
             # I write a Allstr.genkpoints -- JamesBourbon  
             # os.system('cp  ../sourcedir/KPOINTS  para%d'%(i+1))
                 
