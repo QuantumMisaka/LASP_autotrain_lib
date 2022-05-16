@@ -1,0 +1,6 @@
+calfact 200  15  1  0
+outfact   1.0   0.0       0.0
+train_RMS     1
+test_RMS      0
+Time_step        1
+BFGS_loop        1
