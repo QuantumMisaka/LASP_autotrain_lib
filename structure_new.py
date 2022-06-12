@@ -1,3 +1,5 @@
+# JamesBourbon in 20220611
+# add coordination pattern calc function
 from atom_k import S_atom 
 from bond_k import bond # not useful in LASP-autotrain
 import numpy as np
@@ -9,7 +11,7 @@ from ctypes import pointer
 import re
 from functools import reduce # in py3
 import pandas as pd
-from coordination_pattern import OneCoordinationPattern, CoordinationPatterns
+# from coordination_pattern import CoordinationPatterns
 
 
 # variable likes to be Str object
@@ -189,13 +191,7 @@ class Str(object):
         latinv    = np.linalg.inv(self.lat)
         self.fdnt = [list(x) for x in np.matmul(self.xa, latinv)]
         # self.fdnt 
-        
-    def calc_dis(self, iatom1, iatom2):
-        '''calc atom distance, considered periodic in x-np.round(x)'''
-        self.cdnt2fcnt() # get fractional coord
-        vbond =np.array(self.fdnt[iatom1])- np.array(self.fdnt[iatom2])
-        dis = np.linalg.norm(np.matmul( np.array([x-np.round(x) for x in vbond]), self.lat))
-        return dis
+
 
 
     def calc_centroid(self):
@@ -235,15 +231,15 @@ class Str(object):
         h1 = a
         #h1= checkzero(h1)
         h2 = b * np.cos(gamma)
-       # h2 = checkzero(h2)
+        # h2 = checkzero(h2)
         h3 = b * np.sin(gamma)
-      #  h3 = checkzero(h3)
+        #  h3 = checkzero(h3)
         h4 = c * np.cos(beta)
-       # h4 = checkzero(h4)
+        # h4 = checkzero(h4)
         h5 = ((h2 - h4)**2 + h3**2 + c**2 - h4**2 - bc2)/(2 * h3)
-       # h5 = checkzero(h5)
+        # h5 = checkzero(h5)
         h6 = np.sqrt(c**2 - h4**2 - h5**2)
-       # h6 = checkzero(h6)
+        # h6 = checkzero(h6)
         
         self.lat = [[h1, 0., 0.], [h2, h3, 0.], [h4, h5, h6]]
 
@@ -299,15 +295,152 @@ class Str(object):
             fout.write('%d %d %d\n'%(ka,kb,kc))
             fout.write('0 0 0')
         
-
+    def set_element_radius(self, dataset_name = ''):
+        """Setting element radius data in structure, by JamesBourbon
+        
+        Default radii dataset from 
+        Chem. Eur. J. 2009, 15, 186–197, DOI: 10.1002/chem.200800987
+        
+        Args:
+            dataset_name (str): Defaults using Eleradii in PeriodicTable.
+            
+        Returns: 
+            radius_dict (dict): Ele_Index for key and Ele_radii for value
+        """
+        radius_dict = {}
+        if bool(dataset_name):
+            # read from external csv file if given
+            try:
+                radius_dataset = pd.read_csv(dataset_name)
+                for ele_index in set(self.Ele_Index):
+                    radii = np.float64(radius_dataset[
+                        radius_dataset["index"] == ele_index ]["radius(A)"])
+                    radius_dict[ele_index] = radii
+            except:
+                for ele_index in set(self.Ele_Index):
+                    radii = PT.Eleradii[ele_index-1] # notice!
+                    radius_dict[ele_index] = radii
+        else:
+            for ele_index in set(self.Ele_Index):
+                radii = PT.Eleradii[ele_index-1]
+                radius_dict[ele_index] = radii
+        return radius_dict
+        
+    
+    
+    def calc_dis(self, iatom1, iatom2):
+        '''calc periodic atom distance, considered periodic in x-np.round(x)
+        
+        just consider one cell'''
+        self.cdnt2fcnt() # get fractional coord
+        vbond =np.array(self.fdnt[iatom1])- np.array(self.fdnt[iatom2])
+        dis = np.linalg.norm(np.matmul( np.array([x-np.round(x) for x in vbond]), self.lat))
+        return dis
+    
     def calc_neighbour(self,iatom):
-        '''calc distance of one atom to all other atom'''
+        '''calc distance of one atom to all other atom
+        
+        cannot consider trans-cell coordination.'''
         dict ={}
         for i in range(self.natom):
             if (i!= iatom):
                 dis= self.calc_dis(iatom,i)
                 dict[i]= dis
         return dict
+    
+    def make_supercell(self,x_max:int,y_max:int,z_max:int,
+                    x_min:int=0, y_min:int=0, z_min:int=0):
+        '''make supercell by x, y, z, running well
+        
+        returns:
+            supercell: list of (ele_index, coordinate)
+        '''
+        supercell = []
+        for i in range(x_min,x_max+1):
+            for j in range(y_min,y_max+1):
+                for k in range(z_min,z_max+1):
+                    dims = [i,j,k]
+                    # get move vector: dims@self.Cell, moving along a,b,c
+                    moved_str = ((self.Ele_Index[index], 
+                                    coord+np.matmul(dims,self.Cell)) 
+                                    for index, coord in enumerate(self.Coord))
+                    supercell += moved_str
+        return supercell
+            
+    # need to be more : this just calc one Str, coordination pattern analysis should in allstr or other
+    # coding in 20220609
+    
+    def coordination_pattern(self, tol=1.21,):
+        '''calc coordination pattern of Str, interface to coordination_pattern.py
+        
+        coor_patterns example: {(Pd, ((Au, 2.4),)), (Au, ((Pd, 2.4),))}
+        
+        Returns:
+            coor_patterns: coordination patterns format set
+        '''
+        # setting
+        # set radius cutoff
+        radius_dict = self.set_element_radius()
+        # judge each dim is thin or not
+        thin_edge_list = [max(radius_dict.values())*i*2*tol+0.2 for i in range(1,5)]
+        shell_k_list = [1.2, 0.6, 0.4, 0.3, 0.25] # test result
+        shell_k = 1.2
+        # last k for large lattice parameter, cutoff ref: 1.0, 0.5, 0.34, 0.25, 0.20
+        # Judge min bond length
+        min_bond = min(PT.Eleradii) * tol
+        # 3x3x3 supercell
+        lat_xyz = np.diag(self.Cell) # describe a shell
+        supercell_333 = self.make_supercell(1,1,1,-1,-1,-1)
+        # distance calculated from central cell
+        coor_patterns = set()
+        for ci,central_coord in enumerate(self.Coord):
+            central_ele = self.Ele_Name[ci]
+            coor_pattern_dict = {}
+            for atom_info in supercell_333:
+                # atom_info: (ele_index, atom_xyz)
+                do_calc = True
+                square_dist_array = []
+                for dim, vector in enumerate(lat_xyz):
+                    # to simplify calculation: not to far in any dim
+                    for i, edge in enumerate(thin_edge_list):
+                        if vector < edge:
+                            shell_k = shell_k_list[i]
+                            break
+                    else:
+                        shell_k = shell_k_list[-1]
+                    square_dist_dim = np.power(central_coord[dim] - atom_info[1][dim], 2)
+                    if square_dist_dim > np.power(vector*shell_k, 2): 
+                        do_calc = False
+                        break
+                    else:
+                        do_calc = True
+                        square_dist_array.append(square_dist_dim)
+                # calc coordination main
+                if do_calc:
+                    bond_dist = np.sqrt(np.sum(square_dist_array))
+                    central_index = self.Ele_Index[ci]
+                    central_radii = radius_dict[central_index]
+                    coor_radii = radius_dict[atom_info[0]]
+                    # coor-bond main judgement
+                    max_bond = (central_radii + coor_radii) * tol
+                    if (bond_dist > max_bond) or (bond_dist < min_bond):
+                        continue
+                    else:
+                        coor_ele = PT.Eletable[atom_info[0]-1]
+                        coor_dist = np.round(bond_dist,1)
+                        coor_pair = (coor_ele, coor_dist)
+                        # get CN
+                        coor_pattern_dict[coor_pair] = coor_pattern_dict.get(coor_pair,0) + 1
+                    # end of coor_bond calc.
+            # transfer to Set(tuple) for coor-patterns format
+            coor_atoms = []
+            for coor_pair, count in coor_pattern_dict.items():
+                coor_atoms.append((coor_pair[0], coor_pair[1], count))
+            coor_atoms = tuple(coor_atoms)
+            coor_pattern_i = (central_ele, coor_atoms)
+            coor_patterns.add(coor_pattern_i)
+        return coor_patterns # can be directly used in CoordinationPatterns.patterns        
+        
 
     def special_neighbour(self,iatom,spe_ele):
         '''calc distance of one atom to all atom of one element''' 
@@ -347,91 +480,8 @@ class Str(object):
     
     # coordination pattern method embedding by JamesBourbon
     
-    def set_element_radius(self, dataset_name="./radius.csv"):
-        """Setting element radius data in structure read from arcfile, by JamesBourbon
-        
-        Default radii dataset from 
-        [Chem. Eur. J. 2009, 15, 186–197, DOI: 10.1002/chem.200800987]
-        
-        Args:
-            dataset_name (str): Defaults to "./radius.csv".
-        """
 
-        radius_dataset = pd.read_csv(dataset_name)
-        radius_dict = {}
-        for element in self.sp.keys():
-            radius = np.float64(radius_dataset[radius_dataset["element"] == element]["radius(A)"])
-            radius_dict[element] = radius
-        self.element_radii = radius_dict
         
-    '''
-    def coordination_pattern_analysis(self, tolerance=1.21):
-        """  calculate the coordination pattern of a cell
-                interface to coordination pattern library
-             
-        Args:
-            tolerance (float, optional): value of tolerance 
-            determine the max-accpeted bonding limit, 
-            best Defaults to 1.21.
-        Returns:
-            [list]: a list have all OneCoordinationpPattern.pattern
-        """
-
-        self.set_element_radius()        
-        
-        all_atom_coor = []
-        supercell_333_frac = self.create_supercell(
-            self.structure_frac, [3, 3, 3])
-        supercell_center = {}
-        # find supercell center by supercell_create format
-        for atom_name, atom_coor in supercell_333_frac.items():
-            if "--111" in atom_name:
-                supercell_center[atom_name] = atom_coor
-        # using supercell center to calculate periodic distance
-        for atom, atom_coor in supercell_center.items():
-            atom_type = self.elements_pink(atom)
-            one_atom_coor_dict = {}
-            for atom_super, coor_super in supercell_333_frac.items():
-                # one atom coordination pattern calculation
-                if atom == atom_super:
-                    continue
-                else:
-                    atom_abs_vector = np.sqrt(
-                        np.square(atom_coor - coor_super))
-                    # for reduce calc frequency
-                    if True in (atom_abs_vector > 1):
-                        continue
-                    else:
-                        atom_distance = self.dist_frac_calc(
-                            atom_coor, coor_super)
-                        atom_type_super = self.elements_pink(atom_super)
-                        distance_range = (
-                            self.element_radii[atom_type] + self.element_radii[atom_type_super]) * tolerance
-                        if atom_distance <= distance_range:
-                            # decimals choose the last num after decimal point to normalization
-                            atom_distance = np.round(atom_distance, decimals=1)
-                            one_atom_coor_type = (
-                                atom_type_super, atom_distance)
-                            one_atom_coor_dict[one_atom_coor_type] = one_atom_coor_dict.get(
-                                one_atom_coor_type, 0) + 1
-            # processed, back to normal
-            atom_original_coor = atom_coor - np.array([1.0, 1.0, 1.0])
-            # atom_original = atom[:-5]
-            one_pattern = (atom_type, one_atom_coor_dict)
-            one_atom_coordination_pattern = OneCoordinationPattern(
-                one_pattern, tuple(atom_original_coor))
-            all_atom_coor.append(one_atom_coordination_pattern)
-            # all_atom_coor can be stored for coordination pattern dataset
-        return all_atom_coor
-    '''
-    
-    
-    
-    
-    
-    
-
-
 
     def simple_class(self,iatom):
         for i in range(self.natom):
@@ -948,22 +998,22 @@ class Str(object):
 
     def frac_center(self,at):
         # recursive to position all fractional coordinate
-         if len(self._cycle)==0: self.centerf[at.keys()[0]]=at.values()[0]; self._currentlist =[]; self._currentlist.append(at.keys()[0])
-         self._cycle.append(at.keys()[0])
+        if len(self._cycle)==0: self.centerf[at.keys()[0]]=at.values()[0]; self._currentlist =[]; self._currentlist.append(at.keys()[0])
+        self._cycle.append(at.keys()[0])
 
-         if len(self.centerf)==self.Nat : return True
-         else:
-             neig = self.neighbor(at)
+        if len(self.centerf)==self.Nat : return True
+        else:
+            neig = self.neighbor(at)
             # get frac of atom at  neig ={1:[XX,XX,XX],2:[XX,XX,XX]}
-             for i in neig.keys():
-                 if i not in self.centerf.keys():
-                     self.centerf[i]=neig[i]
-                     self._currentlist.append(i)
-                     if len(self.centerf)==self.Nat : return True
-             for i in neig.keys():
-                 if i not in self._cycle:  self.frac_center({i:self.centerf[i]})
-                 if len(self.centerf)==self.Nat : return True
-             if at.keys()[0]==0 : return False
+            for i in neig.keys():
+                if i not in self.centerf.keys():
+                    self.centerf[i]=neig[i]
+                    self._currentlist.append(i)
+                    if len(self.centerf)==self.Nat : return True
+            for i in neig.keys():
+                if i not in self._cycle:  self.frac_center({i:self.centerf[i]})
+                if len(self.centerf)==self.Nat : return True
+            if at.keys()[0]==0 : return False
 
 
     def chemical_formula(self):
