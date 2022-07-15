@@ -44,7 +44,7 @@ def reduceList( l ):
 class Atom(object):
     def __init__(self, coord, ele, charge):
         self.cdnt = [x for x in coord]  # save coordination
-        self.ele  = ele
+        self.ele_num  = ele
         self.no   = Eledict[ele] 
         self.charge = charge
 
@@ -91,8 +91,8 @@ class Structure(object):
         h4 = c * math.cos(beta)
         h5 = ((h2 - h4)**2 + h3**2 + c**2 - h4**2 - bc2)/(2 * h3)
         h6 = math.sqrt(c**2 - h4**2 - h5**2)
-        self.lat = [[h1, 0., 0.], [h2, h3, 0.], [h4, h5, h6]]
-        self.nlat = np.array(self.lat)
+        self.Cell = [[h1, 0., 0.], [h2, h3, 0.], [h4, h5, h6]]
+        self.nlat = np.array(self.Cell)
 
     def calAtomNum(self, ):
         self.natm    = len(self.atom)
@@ -113,8 +113,8 @@ class Structure(object):
         if sort_ele: self.sortAtom()
         for iatom,atom in enumerate(self.atom):
             fout.write("%-2s%18.9f%15.9f%15.9f CORE %4d %-2s %-2s %8.4f %4d\n"%(
-                        atom.ele, atom.cdnt[0], atom.cdnt[1], atom.cdnt[2],
-                        iatom+1, atom.ele, atom.ele, atom.charge, iatom+1))
+                        atom.ele_num, atom.cdnt[0], atom.cdnt[1], atom.cdnt[2],
+                        iatom+1, atom.ele_num, atom.ele_num, atom.charge, iatom+1))
         fout.write("end\nend\n")
 
 class Set(list):
@@ -202,7 +202,7 @@ class Set(list):
                 fout.write("No.    %s\n"%reduceList(["%4d"%num for num in astr.eleNum]))
                 fout.write("number %s\n"%reduceList(["%4d"%num for num in astr.ntpatom]))
                 fout.write("weight %9.3f  %9.3f\n"%(astr.e_weight, astr.f_weight))
-                for lat in astr.lat:
+                for lat in astr.Cell:
                     fout.write("lat %15.8f  %15.8f  %15.8f\n"%(lat[0], lat[1], lat[2]))
                 for atom in astr.atom:
                     fout.write("ele %4s %15.8f  %15.8f  %15.8f  %15.8f\n"%(
@@ -259,18 +259,18 @@ class trainSet(Set, list):
                 currentStr += 1
             elif 'Energy' in line:
                 self.append(Structure(line.split()[2]))
-                self[currentStr].lat = []
+                self[currentStr].Cell = []
                 self[currentStr].nminimum = 1
                 self[currentStr].numstr   = currentStr
             elif 'lat' in line:
-                self[currentStr].lat.append([float(item) for item in line.split()[1:4]])
+                self[currentStr].Cell.append([float(item) for item in line.split()[1:4]])
             elif 'ele' in line and 'element' not in line:
                 self[currentStr].addAtom(line, type=2)
         
         self.numstr = currentStr + 1
         for istr in range(self.numstr): 
             self[istr].calAtomNum()
-            self[istr].nlat=np.array(self[istr].lat)
+            self[istr].nlat=np.array(self[istr].Cell)
             self.lat2abc(istr)
             self[istr].id = istr
 
@@ -288,12 +288,12 @@ class trainSet(Set, list):
                     iatom += 1
 
     def lat2abc(self, i):
-        a = np.linalg.norm(self[i].lat[0])
-        b = np.linalg.norm(self[i].lat[1])
-        c = np.linalg.norm(self[i].lat[2])
-        alpha = math.acos(np.dot(self[i].lat[1],self[i].lat[2]) / (b*c))*180.0/np.pi
-        beta  = math.acos(np.dot(self[i].lat[0],self[i].lat[2]) / (a*c))*180.0/np.pi
-        gamma = math.acos(np.dot(self[i].lat[0],self[i].lat[1]) / (a*b))*180.0/np.pi
+        a = np.linalg.norm(self[i].Cell[0])
+        b = np.linalg.norm(self[i].Cell[1])
+        c = np.linalg.norm(self[i].Cell[2])
+        alpha = math.acos(np.dot(self[i].Cell[1],self[i].Cell[2]) / (b*c))*180.0/np.pi
+        beta  = math.acos(np.dot(self[i].Cell[0],self[i].Cell[2]) / (a*c))*180.0/np.pi
+        gamma = math.acos(np.dot(self[i].Cell[0],self[i].Cell[1]) / (a*b))*180.0/np.pi
         self[i].abc = [a,b,c,alpha,beta,gamma]
 
 if __name__ == '__main__':

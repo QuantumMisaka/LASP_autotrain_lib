@@ -17,4 +17,4 @@ class S_atom(object):
         self.bondtype = []                                                   
         self.Ctye = 'empty'                                                  
         self.charge = 0                                                                   
-                                   
+                            

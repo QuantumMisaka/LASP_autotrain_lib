@@ -1,0 +1,37 @@
+potential vasp 
+explore_type ssw
+
+Run_type     15 
+SSW.SSWsteps   0
+SSW.output   T  
+SSW.printevery   T 
+SSW.printselect   6
+SSW.printdelay   -1
+
+SSW.globalcompress   0.1000  
+SSW.Lmode_Q   T 
+SSW.Ratio_local   15 
+SSW.cell_allowexpand   0.1000 
+
+SSW.NG     10 
+SSW.NG_cell    8 
+SSW.ds_atom      0.6000
+SSW.ds_cell      0.4000
+
+SSW.ftol      0.1000 
+SSW.strtol      0.2000
+SSW.Temp    200.0000 
+
+SSW.MaxOptstep           300
+SSW.inirot      0
+SSW.Crystal_extra_step   T
+
+SSW.Ngaus_relax_ini    5
+SSW.DimerdR      0.010
+SSW.pressure      0.0000
+SSW.cellmode_factor    0.1250
+SSW.Ratio_atomcell     2
+SSW.gaussW_level       1
+SSW.VolChange_perstep    0.1000
+SSW.disp_perstep    1.0000
+SSW.bonddisp_perstep   0.2000

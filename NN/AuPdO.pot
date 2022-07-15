@@ -1,8 +1,8 @@
 
 Global Neural Network Potential For LASP
 Reference    : www.lasphub.com
-Note         : 
-Species      :                                                             
+Note         : random_dataset
+Species      : O Pd Au                                                             
 Version      : 20220514005727
 Dataset size : 16927
 

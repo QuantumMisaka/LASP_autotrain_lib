@@ -3,9 +3,10 @@
 # many differences from original auto.py
 # last change in 20220430, V1.0-testing
 # should take care of Pool(process=poolsize)
-# Dependence: allstr_new.py structure_new.py atom_k.py hostfile.py nodejob.py PeriodicTable.py
-# start by jobs_slurm.slurm, test pass
+# start by jobs_local.slurm, test pass
 # prepara lasp_ssw.script in SSW, vasp.script in VASP, lasp.slurm in NN
+# insert coordination patterns sampling method in nodejob_coor.py and update_patterns.py
+# still need test
 
 import os
 import sys
@@ -13,14 +14,16 @@ import glob
 import shutil
 from multiprocessing import Pool
 import time
-
 from allstr_new import BadStr
 from allstr_new import AllStr as AllStr_new # need to be noted
 import numpy as np
+from update_patterns import get_patterns
+# for coor-patterns
+SSW_choosing_mode = 1 # 0 for random 1 for coor-pattern
+ROOTDIR = os.getcwd()
+patterns_DB = f"{ROOTDIR}/traindata_patterns.json"
 
-# def collect_allstr(procname, workdir, nbadstr):
-  #   os.system('ssh %s "python %s/nodejob.py %s/%s %d" '%(procname, os.getcwd(), os.getcwd(), workdir, nbadstr))
-
+#  used in SSW-sampling collection
 def nodejob_to_collect_allstr(rootdir, workdir, nbadstr):
     '''to parallelly collect allstr.arc result from workdirs, used by pool.apply_async()
     
@@ -28,16 +31,27 @@ def nodejob_to_collect_allstr(rootdir, workdir, nbadstr):
     '''
     command = f'python {rootdir}/nodejob.py {workdir} {nbadstr}'
     os.system(command)
+    
+    
+def nodejob_coordination_collect(rootdir, workdir, nbadstr):
+    '''to parallelly collect allstr.arc result from workdirs, by coordination pattern choosing
+    
+    collect result will be print-out as outstr.arc in workdirs
+    '''
+    command =  f'python {rootdir}/nodejob_coor.py {workdir} {nbadstr}'
+    os.system(command)
 
 
 class RunSSW:
-    def __init__(self,SSWdir,cpuperjob,prog,masternode):
+    def __init__(self,SSWdir,cpuperjob,prog,masternode,choose_mode=1):
         self.dir = SSWdir
         self.cpuperjob =int(cpuperjob)
         self.prog = prog
         self.nbadneed = 50
         self.masternode= masternode # masternode status setting
         self.poolsize =int(total_cpu/cpuperjob) # default
+        self.choose_mode = choose_mode
+        # poolsize parallel now only used for collect data
     
     
     def build_SSW_folder(self, SSWdir:str, njob:int, ncycle:int, allstr:int):
@@ -226,7 +240,7 @@ class RunSSW:
         return 
 
 
-    def collect_data(self,workdirs:list,ncycle:int,allstr:int):
+    def collect_data(self,workdirs:list,ncycle:int,allstr:int, choose_mode = 1):
         '''for collect running result
             merge and move SSW-NN result to VASP workdir
             
@@ -244,7 +258,11 @@ class RunSSW:
             if allstr == 0: 
                 os.system('cat %s/Badstr.arc >> allstr.arc-%d'%(wdir,ncycle))
             else:
-                pool.apply_async(nodejob_to_collect_allstr, (self.dir, wdir, self.nbadneed))
+                # switch random and coor-pattern choosing method
+                if choose_mode == 1:
+                    pool.apply_async(nodejob_coordination_collect, (self.dir, wdir, self.nbadneed))
+                else:
+                    pool.apply_async(nodejob_to_collect_allstr, (self.dir, wdir, self.nbadneed))
         time.sleep(60)
         
         for i in range(len(workdirs)):
@@ -341,9 +359,9 @@ class RunVASP:
             else:
                 AllStr[i].genKPOINTS('KPOINTS')
                 os.system('mv KPOINTS para%d/'%(i+1))
-            # I write a Allstr.genkpoints -- JamesBourbon  
+            # I write a Allstr.genkpoints -- JamesBourbon
+            # but still can directly copy KPOINTS: use mesh auto 25
             # os.system('cp  ../sourcedir/KPOINTS  para%d'%(i+1))
-                
             os.system('rm -f para%d/input; cp  ../sourcedir/input  para%d'%(i+1,i+1))
             os.system('cp  ../sourcedir/INCAR  para%d'%(i+1))
             #os.system('sed -i "/^LDAU /d" para%d/INCAR'%(i+1))
@@ -400,11 +418,17 @@ class RunVASP:
 
         # collect data
         print('---------Start collect data---------')
-        self.collect_data(ncycle,len(AllStr))
+        self.collect_data(ncycle,len(AllStr)) # give labeled TrainStr and TrainFor
         #if(Lallstr==0): self.compare(ncycle)
         self.compare(ncycle)
         # self.screen_data('1.arc',forcefile ='2.arc')
         naddstr = int(os.popen("grep Energy TrainStr.txt -c").readline().strip())
+        # update Coordination Patterns Database if set it
+        # using get_patterns in update_patterns.py to update patterns
+        if SSW_choosing_mode == 1:
+            print("-------Start Update Coordination Patterns Database--------")
+            get_patterns(init_db=patterns_DB) # give patterns_db.json
+            os.system(f"cp patterns_db.json {patterns_DB}")  
         # add TrainStr and TrainFor to NNdir
         # the Structure before will also include in NNtrain
         os.system('cat TrainStr.txt >> ../../NN/TrainStr.txt  ')
@@ -432,7 +456,7 @@ class RunVASP:
         else :
             err_all = 0
             for i in range(len(nn)):
-                err_all=err_all+np.square(nn[i].Energy-vasp[i].Energy)
+                err_all=err_all+np.square(nn[i].energy-vasp[i].energy)
             rmse= np.sqrt(err_all/len(nn))
             print('----------- rmsE %14.8f eV ---------'%rmse)
 
@@ -506,9 +530,9 @@ class RunVASP:
     
         print('Final Dump Str:',len(AllStr))
         if len(AllStr) >0:
-            AllStr.gen_arc(list(range(len(AllStr))),'outstr.arc',2)
+            AllStr.gen_arc(range(len(AllStr)),'outstr.arc',2)
             if AllStr[0].Lfor: 
-                AllStr.gen_forarc(list(range(len(AllStr))),'outfor.arc',2)
+                AllStr.gen_forarc(range(len(AllStr)),'outfor.arc',2)
 
 
 
@@ -738,8 +762,7 @@ if __name__ == "__main__":
     global para
     para = read_para() # read parameter from console
     
-    rootdir = os.getcwd()
-
+    rootdir = ROOTDIR
     # check SSW VASP NN file
     if not glob.glob('SSW/sourcedir'):
         print('not find SSW file')
@@ -768,7 +791,7 @@ if __name__ == "__main__":
         os.system('rm -rf NN/cycle-*')
 
     # setting SSW-NN
-    SSW = RunSSW(SSWdir,para['cpuperjob']['SSW'],para['prog']['SSW'],para['masternode'])
+    SSW = RunSSW(SSWdir,para['cpuperjob']['SSW'],para['prog']['SSW'],para['masternode'], SSW_choosing_mode)
     # totalproc =SSW.set_hostfile()
     # setting VASP-DFT
     VASP = RunVASP(VASPdir,para['cpuperjob']['VASP'],para['prog']['VASP'],para['masternode'])
@@ -782,7 +805,7 @@ if __name__ == "__main__":
     jobname,autobase = NN.get_job_info()
 
     # global poolcount
-    # poolcount =0
+    # poolcount =0d
 
 
 

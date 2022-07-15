@@ -14,11 +14,11 @@ def collect_allstr(workdirs,nbadneed):
         return
     elif str_count <= nbadneed:
         print('collect nbad not enough, but print outstr.arc to add')
-        AllStr.gen_arc(list(range(str_count)), out_file,2)
+        AllStr.gen_arc(range(str_count), out_file,2)
     else:
         print('collect Enough nbad, print outstr.arc add to VASP_DFT')
         AllStr.random_arange(200)
-        AllStr.gen_arc(list(range(nbadneed)), out_file,2)
+        AllStr.gen_arc(range(nbadneed), out_file,2)
     return
 
 if __name__ == "__main__":

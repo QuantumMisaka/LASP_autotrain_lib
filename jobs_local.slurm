@@ -34,6 +34,7 @@ export LD_LIBRARY_PATH=$LIBVASP:$LD_LIBRARY_PATH
 EXEC=${LASP_DIR}/Src/lasp 
 
 POTNAME="AuPdO"
+COOR_PATTERNS=1 # for update coor-pattern from train_data every cycle
 MAXCYCLE=100
 NP=$SLURM_NPROCS
 ROOTDIR=$(pwd)
@@ -106,6 +107,10 @@ do
     # pot and trainfor/trainstr must be backup
     cp TrainStr.txt TrainStr.txt-${i}-${Ntotal}
     cp TrainFor.txt TrainFor.txt-${i}-${Ntotal}
+    if (( COOR_PATTERNS ))
+    then
+        python $ROOTDIR/get_coordination_patterns.py
+        mv 
     cd $ROOTDIR
 
 printf " End SSW-DFT-NN Cycle %d\n" $i

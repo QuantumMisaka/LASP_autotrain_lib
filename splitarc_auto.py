@@ -1,5 +1,5 @@
-# for split arc-file to single-DFT based by lasp-autolin
-# last change by JamesBourbon in 20220423
+# for split arc-file to single-DFT based by lasp_pylib
+# last change by JamesBourbon in 20220714, minor update
 
 import sys
 import os
@@ -7,8 +7,7 @@ import shutil
 from allstr_new import AllStr as AllStr_new
 
 
-def split(arcfile, paradir=''):
-    workname="AuPdO_para"
+def split(arcfile, paradir='', workname="para"):
     ROOTDIR = os.getcwd()
     AllStr = AllStr_new() 
     AllStr.arcinit([0,0],arcfile)
@@ -36,6 +35,9 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         arcfile = sys.argv[1]
         split(arcfile)
+    elif len(sys.argv) == 4:
+        arcfile, paradir, workname = sys.argv[1:]
+        split(arcfile, paradir, workname)
     else:
         arcfile, paradir = sys.argv[1:]
         split(arcfile, paradir)

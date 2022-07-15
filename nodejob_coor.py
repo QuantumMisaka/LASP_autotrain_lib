@@ -1,25 +1,54 @@
 # for parallelly running collect allstr in auto.py
-# last change by JamesBourbon in 20220405
+# can directly used to choose traindata_update structure
+# last change by JamesBourbon in 20220711
+# SSW_choose_mode = 1 in auto.py, not test yet
 
 from allstr_new import AllStr as AllStr_new
+# from structure_new import Str
+from coordination_pattern import CoordinationPatterns
 import sys
+import os
 
-def collect_allstr(workdirs,nbadneed):
-    print("collect allstr from SSW nodejob.py")
-    AllStr = AllStr_new() 
+# init setting
+new_pattern_limit = 0.1
+patterns_db = "traindata_patterns.json" # in SSW workdir
+chosen_patterns = CoordinationPatterns(name="train_data", limit=new_pattern_limit)
+if os.path.exists(patterns_db):
+    chosen_patterns.read_coordination_json(patterns_db)
+
+def collect_allstr(workdirs,nbadneed,patterns_db=patterns_db):
+    choosing_volume = 10*nbadneed
+    # volume give a larger choosing space
+    print("collect allstr from SSW nodejob_coor.py")
+    AllStr = AllStr_new()
     AllStr.arcinit([0,0],'%s/allstr.arc'%(workdirs)) 
+    AllStrGot = AllStr_new() 
     str_count = len(AllStr)
     out_file = '%s/outstr.arc'%workdirs
     if (str_count == 0): 
         return
-    elif str_count <= nbadneed:
+    elif str_count <= choosing_volume:
         print('counting nbad: not enough')
         AllStr.gen_arc(list(range(str_count)), out_file,2)
     else:
+        # use coor_pattern method to collect structure
+        AllStr.random_arange(10)
+        for struc in AllStr:
+            # struc:Str
+            one_str_patterns = struc.coordination_pattern()
+            updating = chosen_patterns.update_patterns_from_structure(
+                one_str_patterns)
+            if updating:
+                AllStrGot.append(struc)
+                if len(AllStrGot) >= nbadneed:
+                    break
         print('collect Enough nbad, print outstr.arc add to VASP_DFT')
+        AllStrGot.gen_arc(list(range(nbadneed)), out_file,2)
+        #  DO NOT update json coor-pattern database now: screen_data is needed backward
+        # json_string = chosen_patterns.print_all_coordinations_full()
+        # with open(patterns_db, 'w') as fo:
+        #     fo.write(json_string)
         
-        AllStr.random_arange(200)
-        AllStr.gen_arc(list(range(nbadneed)), out_file,2)
     return
 
 if __name__ == "__main__":

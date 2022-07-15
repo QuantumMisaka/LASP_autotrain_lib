@@ -52,7 +52,7 @@ if __name__ == "__main__":
     print("Summary of Stein-Q value Minimum")
     print("                     Q2          Q4          Q6   ")
     for i in range(len(allstr)):
-        print("%5d   %8.4f  %8.4f  %8.4f  %8.4f "%(i,allstr[i].Energy,float(allstr[i].Q[0]),float(allstr[i].Q[1]),float(allstr[i].Q[2])))
+        print("%5d   %8.4f  %8.4f  %8.4f  %8.4f "%(i,allstr[i].energy,float(allstr[i].Q[0]),float(allstr[i].Q[1]),float(allstr[i].Q[2])))
 
     print('Finish ---------------------------------------------')
 
@@ -60,6 +60,6 @@ if __name__ == "__main__":
     print("Summary of Distance-weighted Stein-Q value Minimum")
     print("                     Q2          Q4          Q6   ")
     for i in range(len(allstr)):
-        print("%5d   %8.4f  %8.4f  %8.4f  %8.4f  "%(i,allstr[i].Energy,float(allstr[i].Q[3]),float(allstr[i].Q[4]),float(allstr[i].Q[5])))
+        print("%5d   %8.4f  %8.4f  %8.4f  %8.4f  "%(i,allstr[i].energy,float(allstr[i].Q[3]),float(allstr[i].Q[4]),float(allstr[i].Q[5])))
 
     print('Finish ---------------------------------------------')

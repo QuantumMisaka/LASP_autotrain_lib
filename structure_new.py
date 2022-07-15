@@ -31,34 +31,34 @@ class Str(object):
     '''
     def __init__(self):
         self.atom = [] # S_atom list for all atom in Str
-        self.Energy = 0 # Energy of a Str
-        self.energy = 0 # Energy of a Str (chaos, not use it, all to Energy)
+        self.energy = 0 # Energy of a Str
         self.abc= [] # lattice parameter
         self.Latt = [] # lattice parameter
-        self.lat = [] # abc-in-xyz, equal to self.Cell
         self.Cell = [] # abc-in-xyz, POSCAR-abc, transfer-matrix
-        self.Nat = 0 # number of atoms in Str
+        self.natom = 0 # number of atoms in Str
         self.Ele_Name =[] # element name list for all atom in str
         self.Ele_Index  = [] # element index of all atom in str
         # Ele_Index are also named iza in ZPLiu group？
         self.Coord = [] # Coordination of each atom
-        self.sp ={} # atom and its number
+        self.sp ={} # atom and their number
         self.sporder= {} # atom ordered by element
         self.Cell = [] # lattice abc in Cartesian-3D
         self.natompe= []
         self.eleList =[]
+        self.ele_nameList = []
         
         # relevant to force
         self.Lfor = True # have allfor.arc to read or not
         self.For= [] # list contains force of Str in each-atom-3D
         self.stress = [] # stress list ?
         
-        # not use
-        # self.lat = []
-        # self.nele = 0 # ?
-        # self.natom = 0
+
+        self.nele = 0 # ?
+        self.natom = 0
+
         # self.serial_num = 0
-        self.MaxFF = 0
+        self.maxF = 0
+        self.max_stress = 0
         self.frac = []
         self.centerf = {}
         self._cycle=[]
@@ -130,6 +130,10 @@ class Str(object):
         elif flag == 2:
             self.atom[serial_num].force= [float(x) for x in line.split()[2:5]]
 
+    def add_stress(self, line, flag=1): # type 1 => for arc file; 2 => Data file
+        if   flag == 1: self.stress = [float(x) for x in line.split()]
+        elif flag == 2: self.stress = [float(x) for x in line.split()[1:7]]
+
     def add_charge(self, base):
         for atom in self.atom:
             atom.charge = base[atom.ele_symbol]
@@ -141,23 +145,34 @@ class Str(object):
             _tmpf =  max([abs(x) for x in atom.force])
             if maxf < _tmpf:
                 maxf = _tmpf
-        self.maxf= maxf
+        self.maxF = maxf
+        self.maxF = maxf
+        
+    def get_max_stress(self):
+        self.max_stress = max(self.stress)
         
 
-    def add_stress(self, line, flag=1): # type 1 => for arc file; 2 => Data file
-        if   flag == 1: self.stress = [float(x) for x in line.split()]
-        elif flag == 2: self.stress = [float(x) for x in line.split()[1:7]]
 
 
     def get_atom_num(self, ):
-        '''used in VASP.run
+        '''used in VASP.run and train_str_init
         
-        for get: natom, ele_List, natompe, nele, elenameList
+        for get: natom, eleList, natompe, nele, ele_nameList
         '''
         self.natom = len(self.atom)
+        self.natom = self.natom
         self.eleList,self.natompe = list(np.unique([atom.ele_num for atom in self.atom],return_counts=True))
-        self.nele =len(self.eleList)
-        self.elenameList  = [PT.Eletable[ele-1] for ele in self.eleList]
+        self.ele_nameList = [PT.Eletable[ele_num-1] for ele_num in self.eleList]
+        self.sp = {}
+        self.sporder = {}
+        for index, ele_name in enumerate(self.ele_nameList):
+            order_count = 1
+            self.sp[ele_name] = self.natompe[index]
+            self.sporder[ele_name] = order_count
+            order_count += 1
+        self.nele = len(self.eleList)
+        self.Ele_Index = [atom.ele_num for atom in self.atom]
+        self.Ele_Name  = [atom.ele_symbol for atom in self.atom]
 
     def screen_upper_surf(self,):
         self.upper =0
@@ -173,7 +188,7 @@ class Str(object):
     def sort_atom_by_z(self,):
         self.atom.sort(key= lambda X: X.xyz[2])
 
-    def cal_two_dim_coord(self, ):
+    def calc_two_dim_coord(self, ):
         self.xa = np.array([atom.xyz for atom in self.atom])
 
     def calc_one_dim_coord(self, ):
@@ -188,11 +203,16 @@ class Str(object):
     def cdnt2fcnt(self, ):
         '''set frac Coord used by self.fdnt'''
         self.cal_two_dim_coord()
-        latinv    = np.linalg.inv(self.lat)
+        latinv    = np.linalg.inv(self.Cell)
         self.fdnt = [list(x) for x in np.matmul(self.xa, latinv)]
         # self.fdnt 
 
-
+    def set_coord(self):
+        '''set self.Coord from self.atom'''
+        for atom in self.atom:
+            # atom: S_atom
+            self.Coord.append(atom.xyz)
+            
 
     def calc_centroid(self):
         # centroid = mass center
@@ -241,13 +261,13 @@ class Str(object):
         h6 = np.sqrt(c**2 - h4**2 - h5**2)
         # h6 = checkzero(h6)
         
-        self.lat = [[h1, 0., 0.], [h2, h3, 0.], [h4, h5, h6]]
+        self.Cell = [[h1, 0., 0.], [h2, h3, 0.], [h4, h5, h6]]
 
     def lat2abc (self, flag=False, inlat=False):
-        if not flag: lat = self.lat
+        if not flag: lat = self.Cell
         else:        lat = inlat
 
-        self.nlat = np.array(self.lat)
+        self.nlat = np.array(self.Cell)
         a = np.linalg.norm(lat[0])
         b = np.linalg.norm(lat[1])
         c = np.linalg.norm(lat[2])
@@ -258,28 +278,28 @@ class Str(object):
         else:        return [a,b,c,alpha, beta, gamma]
 
 
-    def outPOSCAR(self,outfile):
+    def outPOSCAR(self,outfile="POSCAR"):
         '''print structure to POSCAR file'''
         f=open(outfile,'w')
         f.write('system\n')
         f.write('1.000000000000\n')
-        for item in self.lat:
+        for item in self.Cell:
             f.write('%12.8f  %12.8f  %12.8f\n'%(item[0],item[1],item[2]))
-        f.write("%s\n" %reduce(lambda a,b:a+b , ["%4s"%s   for s   in self.elenameList]))
+        f.write("%s\n" %reduce(lambda a,b:a+b , ["%4s"%s   for s   in self.ele_nameList]))
         f.write("%s\n" %reduce(lambda a,b:a+b , ["%4d"%num for num in self.natompe]  ))
         f.write('Cart\n')
         for atom in self.atom:
             f.write('%12.8f  %12.8f  %12.8f\n'%(atom.xyz[0],atom.xyz[1],atom.xyz[2]))
         f.close()
 
-    def genPOTCAR(self,sourcedir,outfile):
+    def genPOTCAR(self,sourcedir,outfile="POTCAR"):
         '''get needed POTCAR from sourcedir, POTCAR will be print named outfile'''
         os.system('rm -rf %s'%outfile)
-        for ele in self.elenameList:
+        for ele in self.ele_nameList:
             os.system('cat %s/POTCAR.%s >> %s'%(sourcedir,ele,outfile))
 
 
-    def genKPOINTS(self,outfile, criteria=25):
+    def genKPOINTS(self,outfile="KPOINTS", criteria=25):
         '''get needed kpoints, ka = kb = kc = criteria
         
         writed by JamesBourbon
@@ -334,7 +354,7 @@ class Str(object):
         just consider one cell'''
         self.cdnt2fcnt() # get fractional coord
         vbond =np.array(self.fdnt[iatom1])- np.array(self.fdnt[iatom2])
-        dis = np.linalg.norm(np.matmul( np.array([x-np.round(x) for x in vbond]), self.lat))
+        dis = np.linalg.norm(np.matmul( np.array([x-np.round(x) for x in vbond]), self.Cell))
         return dis
     
     def calc_neighbour(self,iatom):
@@ -379,7 +399,6 @@ class Str(object):
             coor_patterns: coordination patterns format set
         '''
         # setting
-        # set radius cutoff
         radius_dict = self.set_element_radius()
         # judge each dim is thin or not
         thin_edge_list = [max(radius_dict.values())*i*2*tol+0.2 for i in range(1,5)]
@@ -490,14 +509,14 @@ class Str(object):
                 #print dis
                 dis2 = self.calc_dis(iatom,i)
                 #print dis
-                bondtest = bond(self.atom[iatom].ele,self.atom[i].ele,dis2)
+                bondtest = bond(self.atom[iatom].ele_num,self.atom[i].ele_num,dis2)
                 bondorder = bondtest.judge_bondorder()
                 if bondorder != 0:
-                    if self.atom[i].ele == 8:
+                    if self.atom[i].ele_num == 8:
                         self.atom[iatom].bondtype.append(101)
-                    if self.atom[i].ele == 6:
+                    if self.atom[i].ele_num == 6:
                         self.atom[iatom].bondtype.append(11)
-                    if self.atom[i].ele == 1:
+                    if self.atom[i].ele_num == 1:
                         self.atom[iatom].bondtype.append(1)
 
         self.atom[iatom].bondtype.sort( )
@@ -506,11 +525,11 @@ class Str(object):
     def bond_search(self,iatom,ele2,flag=1):
         bondlist =[]
         for i in range(self.natom):
-            if (i != iatom) and self.atom[i].ele ==ele2:
-                if flag ==2 and i<iatom and self.atom[iatom].ele ==ele2: continue
+            if (i != iatom) and self.atom[i].ele_num ==ele2:
+                if flag ==2 and i<iatom and self.atom[iatom].ele_num ==ele2: continue
                 #dislist.append(self.cal_distance(iatom,i))
                 dis = self.calc_dis(iatom,i)
-                bondtest = bond(self.atom[iatom].ele,self.atom[i].ele,dis)
+                bondtest = bond(self.atom[iatom].ele_num,self.atom[i].ele_num,dis)
                 bondorder = bondtest.judge_bondorder()
                 if bondorder!= 0:
                     bondlist.append(dis)
@@ -523,25 +542,25 @@ class Str(object):
             if (i != iatom):
                 #dislist.append(self.cal_distance(iatom,i))
                 dis = self.calc_dis(iatom,i)
-                bondtest = bond(self.atom[iatom].ele,self.atom[i].ele,dis)
+                bondtest = bond(self.atom[iatom].ele_num,self.atom[i].ele_num,dis)
                 bondorder = bondtest.judge_bondorder()
-                if bondorder != 0 :#and self.atom[i].ele == 8:
+                if bondorder != 0 :#and self.atom[i].ele_num == 8:
                     self.atom[iatom].bondlist.append(bondorder)
                     #for id,iza in enumerate(elelist):
-                    #    if self.atom[i].ele ==iza:
+                    #    if self.atom[i].ele_num ==iza:
                     #        if id >0:
                     #            self.atom[iatom].bondtype.append(bondorder+10**id)
                     #        else:
                     #            self.atom[iatom].bondtype.append(bondorder)
                     #        break
 
-                    if self.atom[i].ele == elelist[3]:
+                    if self.atom[i].ele_num == elelist[3]:
                         self.atom[iatom].bondtype.append(bondorder+1000)
-                    if self.atom[i].ele == elelist[2]:
+                    if self.atom[i].ele_num == elelist[2]:
                         self.atom[iatom].bondtype.append(bondorder+100)
-                    if self.atom[i].ele == elelist[1]:
+                    if self.atom[i].ele_num == elelist[1]:
                         self.atom[iatom].bondtype.append(bondorder+10)
-                    if self.atom[i].ele == elelist[0]:
+                    if self.atom[i].ele_num == elelist[0]:
                         self.atom[iatom].bondtype.append(bondorder)
         self.atom[iatom].species= len(self.atom[iatom].bondlist)
 
@@ -580,7 +599,7 @@ class Str(object):
 
     def calc_Ctypes(self, ):
         self.calc_one_dim_coord()
-        cell = reduce(lambda a,b: a+b, self.lat)
+        cell = reduce(lambda a,b: a+b, self.Cell)
         #print cell
         self.c_natm = pointer(ctypes.c_int(self.natom))
         self.c_xa   = pointer((ctypes.c_double*len(self.xa_onedim))(*self.xa_onedim))
@@ -594,7 +613,7 @@ class Str(object):
         self.calc_Ctypes()
         q = ctypes.cdll.LoadLibrary('/home7/kpl/pymodule/script/Lib_Qcal/calQ.so')
         natom = self.c_natm
-        el    = pointer(ctypes.c_double(self.Energy))
+        el    = pointer(ctypes.c_double(self.energy))
         atom  = pointer(ctypes.c_int(0))
         sym   = pointer(ctypes.c_int(int(0)))
         za    = self.c_iza
@@ -644,7 +663,7 @@ class Str(object):
             #print _elelist
             if _tmpcharge%2 != 0:
                 for atom in item:
-                    if atom.ele== 7:
+                    if atom.ele_num== 7:
                         if _elelist ==[7,8]:
                             return 15
                         if  _elelist ==[7,8,8]:
@@ -752,11 +771,11 @@ class Str(object):
         for i in range(self.natom):
             for j in range(i+1,self.natom):
                 if self.bmx2D[i][j] > 0:
-                    if self.atom[j].ele !=1:
+                    if self.atom[j].ele_num !=1:
                         self.atom[i].expbond = self.atom[i].expbond +1
                     else:
                         self.atom[i].imph = self.atom[i].imph +1
-                    if self.atom[i].ele !=1:
+                    if self.atom[i].ele_num !=1:
                         self.atom[j].expbond = self.atom[j].expbond +1
                     else:
                         self.atom[j].imph = self.atom[j].imph +1
@@ -767,11 +786,11 @@ class Str(object):
         needH = 2
         num_heavyatom = 0
         for atom in self.atom:
-            if atom.ele == 1 :
+            if atom.ele_num == 1 :
                 nH = nH +1
             else:
                 num_heavyatom = num_heavyatom +1 
-                needH= needH + (8-atom.ele)
+                needH= needH + (8-atom.ele_num)
         self.UnsNum =(needH -nH)/2
         self.nheavyatom = num_heavyatom
 
@@ -785,10 +804,10 @@ class Str(object):
             for j in range(self.natom):
                 if self.bmx2D[i][j] > 0:
                     self.bmxsave[i][j] = self.bmx2D[i][j]
-                    if self.atom[i].ele > 18 :#or self.atom[j].ele > 18:
+                    if self.atom[i].ele_num > 18 :#or self.atom[j].ele_num > 18:
                         self.bmx2D[i][j] =0
                         self.surface_atom[j]= 1
-                    if self.atom[j].ele > 18:
+                    if self.atom[j].ele_num > 18:
                         self.bmx2D[i][j] =0
                         self.surface_atom[i]= 1
 
@@ -812,10 +831,10 @@ class Str(object):
 #"must excute transfer before calling the different part function"
 #
     def transfer_toP_XYZ_coordStr(self):
-        self.Nat = self.natom
+        self.natom = self.natom
         self.Latt = self.abc
         self.Cell = self.Latt2Cell()
-        self.Energy = self.Energy
+        self.energy = self.energy
         self.Ele_Name =[]
         self.Ele_Index  = []
         self.Coord = []
@@ -824,7 +843,7 @@ class Str(object):
             self.Ele_Index.append(atom.ele_num)
             self.Coord.append(atom.xyz)
     
-        for iele,elesymbol in enumerate(self.elenameList):
+        for iele,elesymbol in enumerate(self.ele_nameList):
             self.sp[elesymbol] = self.natompe[iele]
             self.sporder[elesymbol] = iele+1
     
@@ -834,19 +853,19 @@ class Str(object):
             for atom in self.atom:
                 self.For.append(atom.force)
             self.get_max_force()
-            self.maxFF = self.maxf
-            self.maxF = self.maxf
+            self.maxF = self.maxF
+            self.maxF = self.maxF
     
     
     def TransferToKplstr(self):
         # many many questions about why should do this function
         self.atom =[] # why define it again?
-        for i in range(self.Nat):
+        for i in range(self.natom):
             self.atom.append(S_atom(self.Coord[i],self.Ele_Index[i]))
             if self.Lfor:
                 self.atom[i].force= self.For[i]
         self.abc= self.Latt
-        # self.energy= self.Energy
+        # self.energy= self.energy
         self.sort_atom_by_element()
         self.get_atom_num()
         self.abc2lat()
@@ -871,18 +890,18 @@ class Str(object):
 
     def myfilter(self,BadStrP):
         if( \
-           self.Energy > BadStrP.HighE*float(self.Nat) or \
-           self.Energy < BadStrP.LowE*float(self.Nat) or \
+           self.energy > BadStrP.HighE*float(self.natom) or \
+           self.energy < BadStrP.LowE*float(self.natom) or \
            min(self.Latt[:3]) < BadStrP.MinLat or \
            max(self.Latt[:3]) > BadStrP.MaxLat or \
            max(self.Latt[3:7]) > BadStrP.MaxAngle or \
            min(self.Latt[3:7]) < BadStrP.MinAngle or \
 ##          max(self.Latt[:3]) > 5.0*min(self.Latt[:3]) or \
-           self.maxFF > BadStrP.MaxFor):
-           #print '111',self.maxFF,BadStrP.MaxFor
+           self.maxF > BadStrP.MaxFor):
+           #print '111',self.maxF,BadStrP.MaxFor
            return False
         else:
-          #print self.Energy,True
+          #print self.energy,True
          # return True
            if len(self.For) :
          #    #print self.maxF,BadStrP.MaxFor
@@ -991,7 +1010,7 @@ class Str(object):
         self.pos = np.dot([0.5,0.5,0.5],self.Cell)
         com = []
         for i in range(3):
-            com.append(sum([x[i] for x in cart])/float(self.Nat))
+            com.append(sum([x[i] for x in cart])/float(self.natom))
         self.cart = np.array([np.add(np.subtract(x,com),self.pos) for x in cart])
         self.frac = np.dot(self.cart,np.linalg.inv(self.Cell))
 #       return self.frac
@@ -1001,7 +1020,7 @@ class Str(object):
         if len(self._cycle)==0: self.centerf[at.keys()[0]]=at.values()[0]; self._currentlist =[]; self._currentlist.append(at.keys()[0])
         self._cycle.append(at.keys()[0])
 
-        if len(self.centerf)==self.Nat : return True
+        if len(self.centerf)==self.natom : return True
         else:
             neig = self.neighbor(at)
             # get frac of atom at  neig ={1:[XX,XX,XX],2:[XX,XX,XX]}
@@ -1009,32 +1028,32 @@ class Str(object):
                 if i not in self.centerf.keys():
                     self.centerf[i]=neig[i]
                     self._currentlist.append(i)
-                    if len(self.centerf)==self.Nat : return True
+                    if len(self.centerf)==self.natom : return True
             for i in neig.keys():
                 if i not in self._cycle:  self.frac_center({i:self.centerf[i]})
-                if len(self.centerf)==self.Nat : return True
+                if len(self.centerf)==self.natom : return True
             if at.keys()[0]==0 : return False
 
 
     def chemical_formula(self):
         # recursive to position all fractional coordinate
         Nmol=0; fragment = {}
-        while len(self.centerf) != self.Nat:
-            for i in range(self.Nat) :
-                 if i not in self.centerf.keys():
-                     self._cycle = [];self._currentlist =[]
-                     L = self.frac_center({i:self.FracCoord()[i]})
-                     Nmol +=1; elelist={}; fragment[Nmol]=""
-                     #print self._currentlist, len(self._currentlist)
-                     for j in self._currentlist:
-                         if self.Ele_Name[j] in elelist.keys() : elelist[self.Ele_Name[j]] +=1
-                         else: elelist[self.Ele_Name[j]] = 1
-                     for j in elelist.keys():
-                         fragment[Nmol]=fragment[Nmol]+j+str(elelist[j])
-                     if L:
-                         self.centralize(0)
-                         for j in range(self.Nat) : self.Coord[j][0:3]= self.cart[j][0:3]
-                         return fragment, self.Coord, self.Cell
+        while len(self.centerf) != self.natom:
+            for i in range(self.natom) :
+                if i not in self.centerf.keys():
+                    self._cycle = [];self._currentlist =[]
+                    L = self.frac_center({i:self.FracCoord()[i]})
+                    Nmol +=1; elelist={}; fragment[Nmol]=""
+                    #print self._currentlist, len(self._currentlist)
+                    for j in self._currentlist:
+                        if self.Ele_Name[j] in elelist.keys() : elelist[self.Ele_Name[j]] +=1
+                        else: elelist[self.Ele_Name[j]] = 1
+                    for j in elelist.keys():
+                        fragment[Nmol]=fragment[Nmol]+j+str(elelist[j])
+                    if L:
+                        self.centralize(0)
+                        for j in range(self.natom) : self.Coord[j][0:3]= self.cart[j][0:3]
+                        return fragment, self.Coord, self.Cell
 
 
 
@@ -1128,7 +1147,7 @@ class Str(object):
 
     def cell_bondconnect(self,cut,cell1,cell0=[0,0,0]):
 
-       frac1=[];VectorA = []; N=self.Nat
+       frac1=[];VectorA = []; N=self.natom
        for i in range(N): frac1.append(np.add(self.frac[i],cell1))
        cart1=np.dot(frac1,self.Cell)
 
@@ -1137,9 +1156,9 @@ class Str(object):
            for i in range(N): frac0.append(np.add(self.frac[i],cell0))
            cart0=np.dot(frac0,self.Cell)
            pos=[]
-           pos.append(sum([y[0] for y in cart0])/float(self.Nat))
-           pos.append(sum([y[1] for y in cart0])/float(self.Nat))
-           pos.append(sum([y[2] for y in cart0])/float(self.Nat))
+           pos.append(sum([y[0] for y in cart0])/float(self.natom))
+           pos.append(sum([y[1] for y in cart0])/float(self.natom))
+           pos.append(sum([y[2] for y in cart0])/float(self.natom))
        else:
            fract0 = self.frac
            cart0  = self.cart
@@ -1159,7 +1178,7 @@ class Str(object):
         frac = self.frac_modulo()
         cart = np.dot(frac,self.Cell)
         cart0= np.dot(at.values()[0],self.Cell)
-        N=self.Nat   #len(cart)
+        N=self.natom   #len(cart)
         neig={};neig2={}
         for j in range(N):
             if j==at.keys()[0]: continue
@@ -1197,7 +1216,7 @@ class Str(object):
         """ find the shortest bond """
         frac = self.frac_modulo()
         cart = np.dot(frac,self.Cell)
-        N=self.Nat   #len(cart)
+        N=self.natom   #len(cart)
         bonddict={}
         if N==1:
             bondname=self.Ele_Name[0]+"-"+self.Ele_Name[0]
@@ -1249,7 +1268,7 @@ class Str(object):
     def _Gen_arc(self,coord, fname='outtmp.arc'):
         with open(fname, 'w') as fout:
             fout.write("!BIOSYM archive 2\nPBC=ON\n")
-            energy = self.Energy
+            energy = self.energy
             i=0
             if not self.Lfor : fout.write("\t\t\t\tEnergy\t%8d        -0.0000  %17.6f\n"%(i+1,energy))
             else: fout.write("\t\t\t\tEnergy\t%8d        %10.6f  %17.6f\n"%(i+1,self[i].maxF,energy))
@@ -1257,7 +1276,7 @@ class Str(object):
             fout.write("!DATE\n")
             lat = self.Latt[0:6]
             fout.write("PBC  %12.6f%12.6f%12.6f%12.6f%12.6f%12.6f\n" %(lat[0],lat[1],lat[2],lat[3],lat[4],lat[5]) )
-            for j in range(self.Nat):
+            for j in range(self.natom):
                 ele = self.Ele_Name[j]
                 xa =  coord[j]
                 fout.write("%-2s%18.9f%15.9f%15.9f CORE %4d %-2s %-2s   0.0000 %4d\n"%\
@@ -1290,8 +1309,8 @@ class Str(object):
         xa = reduce(lambda a,b:a+b, self.Coord)
         cell = reduce(lambda a,b:a+b, self.Cell)
 
-        natom = pointer(ctypes.c_int(self.Nat))
-        el    = pointer(ctypes.c_double(self.Energy))
+        natom = pointer(ctypes.c_int(self.natom))
+        el    = pointer(ctypes.c_double(self.energy))
         atom  = pointer(ctypes.c_int(0))
         sym   = pointer(ctypes.c_int(int(0)))
         za    = pointer((ctypes.c_int*len(self.Ele_Index))(*self.Ele_Index))

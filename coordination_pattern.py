@@ -33,7 +33,7 @@ class CoordinationPatterns():
             raise ValueError
         self.update_limit = limit
         if bool(init_patterns):
-            self.update_patterns_from_structure(init_patterns, name=name)
+            self.update_from_patterns(patterns=init_patterns)
         self.set_operation_log()
     
     def add_one_pattern(self, pattern:tuple):
