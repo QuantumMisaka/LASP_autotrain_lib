@@ -1,5 +1,5 @@
 # dynamic verlet coordination pattern choose structure from arcfile
-# JamesBourbon in 20220714, test passed
+# JamesBourbon in 20220714
 
 from coordination_pattern import CoordinationPatterns
 from allstr_new import AllStr as AllStr_new
@@ -12,6 +12,8 @@ import sys
 # parameter and const
 PROJECT_NAME = "Au8Pd8O24_5020"
 FILENAME = "allstr.arc"
+COOR_ACCEPT_RATE = 1
+# rate(limit): >1 for new patterns num, <1 for new patterns ratio
 ACCEPT_COUNT = 50
 REJECT_COUNT = 20
 ENERGY_LIMIT = -6000 # can disable filter by =-100000
@@ -27,8 +29,8 @@ SCR_DIR = "scratch"
 input_allstr = AllStr_new()
 input_allstr.arcinit(strfile=FILENAME, forfile="")
 target_allstr = AllStr_new()
-patterns_db = CoordinationPatterns(
-        name=PROJECT_NAME, output=PROJECT_NAME+"_coor_run.log" )
+patterns_db = CoordinationPatterns(name=PROJECT_NAME, 
+                output=PROJECT_NAME+"_coor_run.log", limit=COOR_ACCEPT_RATE)
 
 
 INTRO = '''
