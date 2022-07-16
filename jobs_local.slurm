@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -J auto-train
-#SBATCH -p g1_shang 
+#SBATCH -p g1_user
 #SBATCH --nodes=1
 ##SBATCH --time=72:00:00 
 #SBATCH --ntasks-per-node=4
@@ -43,6 +43,7 @@ SSWDIR=$ROOTDIR/SSW
 NNDIR=$ROOTDIR/NN
 VASPDIR=$ROOTDIR/VASP
 
+cp $NNDIR/${POTNAME}.pot $SSWDIR/sourcedir/
 cd $SSWDIR/sourcedir
 for((i=1;i<=28;i++))
 do
@@ -107,10 +108,12 @@ do
     # pot and trainfor/trainstr must be backup
     cp TrainStr.txt TrainStr.txt-${i}-${Ntotal}
     cp TrainFor.txt TrainFor.txt-${i}-${Ntotal}
-    if (( COOR_PATTERNS ))
-    then
-        python $ROOTDIR/get_coordination_patterns.py
-        mv 
+    # coor_patterns: not necessary
+    # if (( COOR_PATTERNS ))
+    # then
+    #     python $ROOTDIR/get_coordination_patterns.py
+    #     mv patterns_db.json ../traindata_patterns.json
+    # fi
     cd $ROOTDIR
 
 printf " End SSW-DFT-NN Cycle %d\n" $i
