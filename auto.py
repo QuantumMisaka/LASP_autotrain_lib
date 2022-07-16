@@ -253,6 +253,9 @@ class RunSSW:
         # using process pool to collect data: not necessary
         if not os.path.exists('nodejob.py'):
             os.system ('ln -s ../nodejob.py .')
+        # get coor-patterns nodejob.py
+        if not os.path.exists('nodejob_coor.py'):
+            os.system ('ln -s ../nodejob_coor.py')
         pool = Pool(processes=8)
         for wdir in workdirs: 
             if allstr == 0: 
