@@ -1,5 +1,5 @@
 # dynamic verlet coordination pattern choose structure from arcfile
-# JamesBourbon in 20220714
+# JamesBourbon in 20220717
 
 from coordination_pattern import CoordinationPatterns
 from allstr_new import AllStr as AllStr_new
@@ -22,7 +22,7 @@ ENERGY_LIMIT = -6000 # can disable filter by =-100000
 DFT_SET = "dft_setting" # setting dir name, empty for not use
 OUTPUT_DIR = "sampled_out"
 PROJECT_DIR = "dft_jobs"
-COOR_DB_READ = "patterns_input.json" # need to be used
+COOR_DB_READ = "patterns_input.json" # read db if have
 FATHER_DIR = os.getcwd()
 # variable
 SCR_DIR = "scratch"
@@ -31,6 +31,8 @@ input_allstr.arcinit(strfile=FILENAME, forfile="")
 target_allstr = AllStr_new()
 patterns_db = CoordinationPatterns(name=PROJECT_NAME, 
                 output=PROJECT_NAME+"_coor_run.log", limit=COOR_ACCEPT_RATE)
+if bool(COOR_DB_READ) and os.path.exists(COOR_DB_READ):
+    patterns_db.read_coordination_json(COOR_DB_READ)
 
 
 INTRO = '''
