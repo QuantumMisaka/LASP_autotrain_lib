@@ -75,7 +75,7 @@ def main_run():
             target_allstr.append(target_str)
         else:
             steps += REJECT_COUNT
-        if steps > step_limit:
+        if steps >= step_limit:
             stop = True
     # print-out
     output_dir = FATHER_DIR+"/"+OUTPUT_DIR
@@ -92,6 +92,7 @@ def main_run():
     )
     patterns_db.print_operation_log()
     # print out
+    print(f'---- choose {update_count} structure in {step_limit} allstr! ----')
     dft_setting = f"{FATHER_DIR}/{DFT_SET}"
     if os.path.isdir(dft_setting) and bool(DFT_SET):
         # print-out directly used for single-DFT
