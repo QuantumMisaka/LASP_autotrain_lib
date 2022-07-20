@@ -1,7 +1,7 @@
 # for parallelly running collect allstr in auto.py
 # can directly used to choose traindata_update structure
-# last change by JamesBourbon in 20220711
-# SSW_choose_mode = 1 in auto.py, not test yet
+# last change by JamesBourbon in 20220720 add checkpoints
+# SSW_choose_mode = 1 in auto.py, test passed
 
 from allstr_new import AllStr as AllStr_new
 # from structure_new import Str
@@ -10,21 +10,21 @@ import sys
 import os
 
 # init setting
-new_pattern_limit = 0.1
+new_pattern_limit = 2
 patterns_db = "traindata_patterns.json" # in SSW workdir
 chosen_patterns = CoordinationPatterns(name="train_data", limit=new_pattern_limit)
 if os.path.exists(patterns_db):
     chosen_patterns.read_coordination_json(patterns_db)
 
-def collect_allstr(workdirs,nbadneed,patterns_db=patterns_db):
-    choosing_volume = 10*nbadneed
+def collect_allstr(workdir,nbadneed):
+    choosing_volume = 20*nbadneed
     # volume give a larger choosing space
     print("collect allstr from SSW nodejob_coor.py")
     AllStr = AllStr_new()
-    AllStr.arcinit([0,0],'%s/allstr.arc'%(workdirs)) 
+    AllStr.arcinit([0,0],'%s/allstr.arc'%(workdir)) 
     AllStrGot = AllStr_new() 
     str_count = len(AllStr)
-    out_file = '%s/outstr.arc'%workdirs
+    out_file = '%s/outstr.arc'%workdir
     if (str_count == 0): 
         return
     elif str_count <= choosing_volume:
@@ -33,16 +33,20 @@ def collect_allstr(workdirs,nbadneed,patterns_db=patterns_db):
     else:
         # use coor_pattern method to collect structure
         AllStr.random_arange(10)
+        count = 0
         for struc in AllStr:
             # struc:Str
             one_str_patterns = struc.coordination_pattern()
             updating = chosen_patterns.update_patterns_from_structure(
                 one_str_patterns)
+            count += 1
             if updating:
                 AllStrGot.append(struc)
                 if len(AllStrGot) >= nbadneed:
+                    print(f"---- effictive/total = {nbadneed}/{count} ----")
                     break
         print('collect Enough nbad, print outstr.arc add to VASP_DFT')
+        chosen_patterns.print_operation_log() # print coor patterns log
         AllStrGot.gen_arc(list(range(nbadneed)), out_file,2)
         #  DO NOT update json coor-pattern database now: screen_data is needed backward
         # json_string = chosen_patterns.print_all_coordinations_full()
