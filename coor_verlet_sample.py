@@ -11,7 +11,7 @@ import sys
 
 # parameter and const
 PROJECT_NAME = "Au8Pd8O24_5020"
-FILENAME = "allstr.arc"
+FILENAME = "test/allstr.arc"
 COOR_ACCEPT_RATE = 1
 # rate(limit): >1 for new patterns num, <1 for new patterns ratio
 ACCEPT_COUNT = 50
@@ -118,9 +118,11 @@ def main_run():
             os.system(f'cp {dft_setting}/lasp.in {dft_setting}/INCAR {dirname}')
             os.chdir(dirname)
             struc = target_allstr[index]
-            # if structure is cluster, KPOINTS need refine
+            # if structure is cluster, KPOINTS need refine to gamma
             struc.genKPOINTS("KPOINTS") 
             struc.outPOSCAR("POSCAR")
+            # update 20220720: print lasp.str from Str._Gen_arc
+            struc._Gen_arc(coord=struc.Coord, fname='lasp.str')
             struc.genPOTCAR(sourcedir=dft_setting, outfile="POTCAR")
             os.chdir(pro_dir)
     else:
