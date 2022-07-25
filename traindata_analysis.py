@@ -1,5 +1,6 @@
 # analysis traindata
-# JamesBourbon finished in 20220714
+# JamesBourbon update in 20220725
+# update function for analysis elements conbination of all struc
 from allstr_new import AllStr
 from structure_new import Str
 import numpy as np
@@ -18,6 +19,7 @@ elif len(sys.argv) > 2:
     allstr_raw.train_data_init(sys.argv[1], sys.argv[2])
 else:
     allstr_raw.train_data_init(strfile, forfile)    
+# out of range： TrainStr not related to TrainFor
 
 # get Traindata info
 size = len(allstr_raw)
@@ -51,8 +53,12 @@ max_for = allstr_sort_by_force[size-1].maxF
 allstr_sort_by_stress = allstr_raw.sort_by_stress()
 max_stress = max(allstr_sort_by_stress[size-1].stress)
 
-
-
+# Traindata element conbination
+elements_conbination_dict = {}
+for stru in allstr_raw:
+    # stru : Str
+    ele_conb = tuple(stru.sp.keys())
+    elements_conbination_dict[ele_conb] = elements_conbination_dict.get(ele_conb, 0) + 1
 
 # print Traindata info
 info_string = "---- Traindata Analysis Result ----\n"
@@ -67,6 +73,9 @@ for ele in all_elements:
     info_string += "%s\t %d\t %d\t %d\t %d\t %d\t %d\n"%(
         ele, natom_stat_by_ele[ele][0], natom_stat_by_ele[ele][1], natom_stat_by_ele[ele][2], 
         natom_stat_by_ele[ele][3], natom_stat_by_ele[ele][4], natom_stat_by_ele[ele][5])
+info_string += "Elements Conbinations in Train-data: \n"
+for ele_conb, count in elements_conbination_dict.items():
+    info_string += f"%s: %d \n"%(ele_conb, count)
 
 info_string += "---- DONE! ----"
 
