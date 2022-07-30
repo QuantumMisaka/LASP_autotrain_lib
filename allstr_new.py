@@ -1,6 +1,5 @@
-# noting by JamesBourb
-
-
+# noting by JamesBourbon
+# last change in 20220730
 # from atom_k import S_atom
 from structure_new import Str
 from structure_new import wrapCalBondMatrix, wrapSegmolecular,wrapCalFakebmx, BadStr, FooError, ParaWrap_JudgeShape, ParaWrap_Shortestbond
@@ -126,7 +125,7 @@ class AllStr(list,Str):
         
         if forcefile:
             f = open(forcefile,'r')
-            currentStr= -1
+            currentStr = -1
             for item in f:
                 if 'Start' in item:
                     currentStr = currentStr+1
@@ -134,7 +133,7 @@ class AllStr(list,Str):
                     self[currentStr].stress= [float(x) for x in item.split()[1:]]
                     iatom = 0
                 elif 'force' in item:
-                    self[currentStr].add_force(item,iatom ,2)
+                    self[currentStr].add_force(item, iatom ,2)
                     iatom = iatom +1
             for i in range(self.numstr):
                 self[i].get_max_force()
@@ -229,8 +228,8 @@ class AllStr(list,Str):
                 fout.write("Energy is %12.6f eV\n"%(str.energy))
                 fout.write("total number of element is %5d\n"%str.natom)
                 fout.write("element in structure:\n")
-                fout.write("symbol %s\n" %reduce(lambda a,b:a+b , ["%4s"%s   for s   in str.Ele_Name]))
-                fout.write("No.    %s\n" %reduce(lambda a,b:a+b , ["%4d"%num for num in str.Ele_Index]))
+                fout.write("symbol %s\n" %reduce(lambda a,b:a+b , ["%4s"%s   for s   in str.ele_nameList]))
+                fout.write("No.    %s\n" %reduce(lambda a,b:a+b , ["%4d"%num for num in str.eleList]))
                 fout.write("number %s\n" %reduce(lambda a,b:a+b , ["%4d"%num for num in str.natompe]  ))
                 for lat in str.Cell:
                     fout.write("lat %15.8f  %15.8f  %15.8f\n"%(lat[0], lat[1], lat[2]))

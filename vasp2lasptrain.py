@@ -1,7 +1,7 @@
 # only used when calculated Single-DFT label
 # transfer OUTCAR, CONTCAR to TrainStr.txt and TrainFor.txt
 # should read OSZICAR to judge VASP-done normally
-# JamesBourbon in 20220428
+# JamesBourbon update in 20220726
 
 import numpy as np
 from functools import reduce
@@ -123,6 +123,8 @@ class Str():
             print("read CONTCAR")
             index = 0
             atom = 0
+            coord_type_status = False
+            Cart = 0
             for line in f:
                 L_list = line.strip().split()
                 index += 1
@@ -140,14 +142,19 @@ class Str():
                         self.ele_inds.append(Eledict[elements[i]])
                         self.element_count[elements[i]] = int(L_list[i])
                     self.element_to_list(self.element_count)
-                if index == 8:
+                # problem: something will add line
+                if index > 7 and coord_type_status == False:
                     # read coord type
-                    Cart=0
-                    if (L_list[0][0]=="C" or L_list[0][0]=="c"): Cart=1 # Cartesian coord
-                    if (L_list[0][0]=="D" or L_list[0][0]=="d"): Cart=0 # frac coord
-                if index >= 9:
+                    if (L_list[0][0]=="C" or L_list[0][0]=="c"): 
+                        Cart=1 # Cartesian coord
+                        coord_type_status = True
+                    if (L_list[0][0]=="D" or L_list[0][0]=="d"): 
+                        Cart=0# frac coord
+                        coord_type_status = True
+                if coord_type_status == True:
                     # read atom coord
-                    if len(L_list) < 3: break
+                    if L_list == []: break # pick the end
+                    if len(L_list) < 3: continue
                     if Cart == 1:
                         self.Coord.append([np.float64(x) for x in L_list[0:3]])
                         self.frac = self.Frac_Coord()
