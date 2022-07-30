@@ -57,7 +57,7 @@ if __name__ == "__main__":
     '''
     
     argnum = len(sys.argv)
-    if argnum == 2 and sys.argv[1] == '-h':
+    if argnum == 2 and '-h' in sys.argv[1]:
         print(HELPTXT)
         exit()
     elif argnum == 1:
