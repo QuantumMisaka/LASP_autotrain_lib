@@ -95,6 +95,7 @@ class Str(object):
             return
         # not important for LASP-VASP training
         elif flag == 2:
+            # for TrainStr
             coord = [float(x) for x in line.split()[2:5]]
             ele_number = int(line.split()[1])
             self.atom.append(S_atom(coord,ele_number))
@@ -124,7 +125,7 @@ class Str(object):
 
 
     def add_force(self, line, serial_num, flag=1):
-        if flag ==1:
+        if flag == 1:
             # for arc
             self.atom[serial_num].force = [float(x) for x in line.split()]
         elif flag == 2:
