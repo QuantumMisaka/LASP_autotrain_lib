@@ -6,7 +6,7 @@ import os
 from allstr_new import AllStr
 from structure_new import Str
 
-ELEMENT_CONB = "Si O"
+ELEMENT_CONB = "Si O Sn"
 STRFILE="TrainStr.txt"
 FORFILE="TrainFor.txt" # can be none
 
@@ -28,7 +28,7 @@ def main(element_conb: set, strfile: str, forfile:str=""):
         if set(struc.ele_nameList) == element_conb:
             traindata_cut.append(struc)
     # print out
-    element_conb_sort = list(element_conb).sort()
+    element_conb_sort = sorted(list(element_conb))
     ele_conb_tick = ''.join(element_conb_sort)
     str_out = f"{ele_conb_tick}_{strfile}"
     for_out = f"{ele_conb_tick}_{forfile}"
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     '''
     
     argnum = len(sys.argv)
-    if sys.argv[1] == '-h':
+    if argnum == 2 and sys.argv[1] == '-h':
         print(HELPTXT)
         exit()
     elif argnum == 1:
