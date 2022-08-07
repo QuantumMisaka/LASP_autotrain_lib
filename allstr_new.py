@@ -564,6 +564,8 @@ class AllStr(list,Str):
 
     def para_run(self,f,num=4):
         '''parallel wrapper to run each structure set with f function
+        
+        Returns: [list] of all results from each Str
         '''
         pool = Pool(processes=num)
         a=[]

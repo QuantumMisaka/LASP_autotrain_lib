@@ -461,6 +461,7 @@ class Str(object):
             coor_patterns.add(coor_pattern_i)
         return coor_patterns # can be directly used in CoordinationPatterns.patterns        
         
+    # end of coordination pattern method embedding by JamesBourbon
 
     def special_neighbour(self,iatom,spe_ele):
         '''calc distance of one atom to all atom of one element''' 
@@ -498,7 +499,6 @@ class Str(object):
         short = min(minlist)
         return short
     
-    # coordination pattern method embedding by JamesBourbon
     
 
         
@@ -1348,6 +1348,8 @@ def ParaWrap_ChemicalFormula(x):
     return x.ChemicalFormula()
 def ParaWrap_SteinhartQ_cal(x):
     return x.SteinhartQ_cal()
+def ParaWrap_Coor_Patterns(x):
+    return x.coordination_pattern()
 
 
 

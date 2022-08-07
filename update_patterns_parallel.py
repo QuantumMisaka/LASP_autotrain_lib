@@ -1,21 +1,38 @@
 # get coodination patterns from allstr.arc or TrainStr.txt
-# can read exist pattern_db and update
-# JamesBourbon in 20220714
-# need parallel, not finished
+# can parallelly read exist pattern_db and update
+# JamesBourbon in 20220807
+# give the same result to single version
+# new question: inconsisitent with update based on db
 
+from multiprocessing.pool import MapResult
+# from multiprocessing import Pool
 import sys
 import os
 
-from allstr_new import AllStr, ParaWrap_CoorPatterns
-# from structure_new import Str
+from allstr_new import AllStr
+from structure_new import Str
 from coordination_pattern import CoordinationPatterns
 import time
 
-NCORE=4
+NCORE=8
+
+INTRO = '''
+---------------------- Introduction ----------------------
+Generate Coordination Patterns of AllStr and update database (if input)
+Python3 Script for LASP Arc or TrainStr.txt Strucuture file
+Parallel Version
+Coding by James.Misaka.Bourbon.Liu, updated in 2022-0807
+
+tips: update from patterns function have some bug
+
+---------------------- Running Script ---------------------'''
 
 
-def get_patterns_parallel(strfile:str="TrainStr.txt",filemode:int=1, init_db=""):
-    '''get all coordination patterns from structure
+def ParaWrap_Coor_Patterns(x):
+    return x.coordination_pattern()
+
+def get_patterns_parallel(strfile:str="TrainStr.txt",filemode:int=1, init_db="", ncore=NCORE):
+    '''get all coordination patterns parallelly from structure
     
     Args:
         strfile: sturcture file name
@@ -39,8 +56,15 @@ def get_patterns_parallel(strfile:str="TrainStr.txt",filemode:int=1, init_db="")
     if os.path.exists(init_db):
         print(f"---- Read {init_db} database for init-patterns ----")
         patterns_obj.read_coordination_json(init_db)
-    patterns_set = target_allstr.para_run(ParaWrap_CoorPatterns, NCORE)
+    # main for-loop running
+    patterns_map_results = target_allstr.para_run(ParaWrap_Coor_Patterns, NCORE)
+    patterns_set = set()
+    for result in patterns_map_results:
+        result: MapResult
+        for pattern_i in result.get():
+            patterns_set.update(pattern_i)
     patterns_obj.update_from_patterns(patterns_set)
+    # update and process
     print("---- DONE! print single_view and database versions of coordination patterns ----")
     patterns_simple_str = patterns_obj.print_all_coordinations_simple()
     patterns_json = patterns_obj.print_all_coordinations_full()
@@ -61,6 +85,9 @@ if __name__ == "__main__":
     elif len(sys.argv) == 4:
         strfile, filemode, init_db = sys.argv[1:]
         get_patterns_parallel(strfile, eval(filemode), init_db)
+    elif len(sys.argv) == 5:
+        strfile, filemode, init_db, ncore = sys.argv[1:]
+        get_patterns_parallel(strfile, eval(filemode), init_db, ncore)
     else:
         get_patterns_parallel()
     end_time = time.perf_counter()

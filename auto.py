@@ -1,7 +1,7 @@
 #! /usr/bin/env  python
 # noted by JamesBourbon: run on slurm-server
 # many differences from original auto.py
-# last change in 20220430, V1.0-testing
+# last change in 20220807, V1.2-for-slurm-server
 # should take care of Pool(process=poolsize)
 # start by jobs_local.slurm, test pass
 # prepara lasp_ssw.script in SSW, vasp.script in VASP, lasp.slurm in NN
@@ -17,11 +17,13 @@ import time
 from allstr_new import BadStr
 from allstr_new import AllStr as AllStr_new # need to be noted
 import numpy as np
-from update_patterns import get_patterns
+# from update_patterns import get_patterns
+from update_patterns_parallel import get_patterns_parallel
 # for coor-patterns
 SSW_choosing_mode = 1 # 0 for random 1 for coor-pattern
 ROOTDIR = os.getcwd()
 patterns_DB = f"{ROOTDIR}/traindata_patterns.json"
+NELM_LIMIT=120
 
 #  used in SSW-sampling collection
 def nodejob_to_collect_allstr(rootdir, workdir, nbadstr):
@@ -38,7 +40,7 @@ def nodejob_coordination_collect(rootdir, workdir, nbadstr):
     
     collect result will be print-out as outstr.arc in workdirs
     '''
-    command =  f'python {rootdir}/nodejob_coor.py {workdir} {nbadstr}'
+    command =  f'python {rootdir}/nodejob_coor.py {workdir} {nbadstr} > coor_printout.log'
     os.system(command)
 
 
@@ -281,7 +283,7 @@ class RunSSW:
         return
 
 class RunVASP:
-    def __init__(self,vaspdir,cpuperjob:int,prog, masternode:int, limit=200):
+    def __init__(self,vaspdir,cpuperjob:int,prog, masternode:int, limit=NELM_LIMIT):
         self.dir =vaspdir
         self.cpuperjob =int(cpuperjob)
         self.prog = prog
@@ -430,7 +432,7 @@ class RunVASP:
         # using get_patterns in update_patterns.py to update patterns
         if SSW_choosing_mode == 1:
             print("-------Start Update Coordination Patterns Database--------")
-            get_patterns(init_db=patterns_DB) # give patterns_db.json
+            get_patterns_parallel(init_db=patterns_DB, ncore=8) # give patterns_db.json
             os.system(f"cp patterns_db.json {patterns_DB}")  
         # add TrainStr and TrainFor to NNdir
         # the Structure before will also include in NNtrain
