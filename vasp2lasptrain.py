@@ -8,7 +8,7 @@ from functools import reduce
 import os
 import sys
 
-NLEM_filter = 200 # 120
+NELM_filter = 200 # 120
 # for check single-dft normally done        
         
 Eledict = {'H': 1,     'He': 2,   'Li': 3,    'Be': 4,   'B': 5,     'C': 6,     'N': 7,     'O': 8,
@@ -203,7 +203,7 @@ class Str():
                     atom_ele_ind, atom_force[0], atom_force[1], atom_force[2]))
             fout.write(" End one structure\n\n")
 
-def is_VASP_done(NLEM_limit=NLEM_filter):
+def is_VASP_done(NELM_limit=NELM_filter):
     '''check VASP-calc. is done or not by read OSZICAR'''
     if os.path.exists("OSZICAR"):
         print("read OSZICAR")
@@ -212,7 +212,7 @@ def is_VASP_done(NLEM_limit=NLEM_filter):
         # print(finish_line)
         # print(icontrol)
         if "E0" in finish_line:
-            if icontrol <= NLEM_limit:
+            if icontrol <= NELM_limit:
                 return True
         print("VASP-calc. not normally done")
         return False
@@ -222,7 +222,7 @@ def is_VASP_done(NLEM_limit=NLEM_filter):
     
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
-        NLEM_filter = sys.argv[1]
+        NELM_filter = sys.argv[1]
     ROOTDIR = os.getcwd()
     print("Transfer VASP-OUTPUT to LASP-TrainData")
     print("need OSZICAR, OUTCAR, CONTCAR")
