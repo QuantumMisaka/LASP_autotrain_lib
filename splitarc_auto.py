@@ -1,5 +1,5 @@
 # for split arc-file to single-DFT based by lasp_pylib
-# last change by JamesBourbon in 20220714, minor update
+# last change by JamesBourbon in 20220801, minor update
 
 import sys
 import os
@@ -13,16 +13,28 @@ def split(arcfile, paradir='', workname="para"):
     AllStr.arcinit([0,0],arcfile)
     str_count = len(AllStr)
     for i in range(str_count):
-        if paradir:
+        if paradir and os.path.isdir(paradir):
             workdir="%s/%s-%d"%(ROOTDIR,workname,i)
-            os.mkdir(workdir)
+            if not os.path.isdir(workdir):
+                os.mkdir(workdir)
             incar='%s/INCAR'%(paradir)
-            potcar='%s/POTCAR'%(paradir)
             inputfile='%s/lasp.in'%(paradir)
             shutil.copy(incar, "%s/INCAR"%workdir)
-            shutil.copy(potcar, "%s/POTCAR"%workdir)
+            # shutil.copy(potcar, "%s/POTCAR"%workdir)
             shutil.copy(inputfile, "%s/lasp.in"%workdir)
             os.chdir(workdir)
+            # genPOTCAR need to specifiy abs-path or relative-path of paradir(setting)
+            if os.path.isdir(paradir):
+                AllStr[i].genPOTCAR(paradir, "POTCAR")
+            else:
+                print("abs path of paradir not find, try to find it in rootdir")
+                abs_paradir = f"{ROOTDIR}/{paradir}"
+                if os.path.isdir(abs_paradir):
+                    AllStr[i].genPOTCAR(abs_paradir, "POTCAR")
+                    print("find POTCAR!")
+                else:
+                    print("paradir NOT Find Error in genPOTCAR!")
+            AllStr[i].outPOSCAR("POSCAR")
             AllStr[i].genKPOINTS("KPOINTS")
             AllStr.gen_arc([i], "lasp.str")
             os.chdir(ROOTDIR)

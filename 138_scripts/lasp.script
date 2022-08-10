@@ -1,0 +1,59 @@
+#!/bin/bash 
+#PBS -N lasp
+#PBS -r n 
+#PBS -j oe 
+#PBS -l walltime=6:00:00
+#PBS -l nodes=1:ppn=24
+#PBS -q xmcao
+
+source /data/intel-env/intel15u6.sh
+
+LASPDIR=/home/users/bks/zhqliu/LASP/INTER_pro3.3.4_intel12_2cw
+EXEC=${LASPDIR}/Src/lasp
+# software for executing
+export LD_LIBRARY_PATH=${LASPDIR}/Libraries/1.vasplib/:$LD_LIBRARY_PATH
+# LASP need other software aid: vasp
+
+##########################################################
+# The following should be no need to
+#       change any of these settings for normal use.
+##########################################################
+
+# go to work dir
+cd $PBS_O_WORKDIR
+# setup mpd env (Of course use some other secret word than "dfadfs")
+if [ ! -f ~/.mpd.conf ]; then
+/bin/echo "secretword=dfadfs" >> ~/.mpd.conf
+/bin/chmod 600 ~/.mpd.conf
+fi
+# setup Nums of Processor
+NP=`cat $PBS_NODEFILE|wc -l`
+echo "Numbers of Processors:  $NP"
+echo "---------------------------"
+echo `date`
+cat $PBS_NODEFILE | uniq
+
+# setup mpi env (em64t)
+#export OMP_NUM_THREADS=1
+#export P4_GLOBMEMSIZE=1073741824
+export I_MPI_PIN_DOMAIN=auto
+export MPD_CON_EXT=$PBS_JOBID
+
+echo "Job Starting at `date`" >> JobRunning
+
+if [[ $PBS_NUM_NODES -eq 1 ]];then
+	mpirun -r ssh -n $NP $EXEC 2>&1 > print-out
+else
+	mpirun -r ssh -genv I_MPI_FABRICS shm:dapl -n $NP $EXEC 2>&1 > print-out
+fi
+
+echo "Job Finished at `date`" >> JobRunning
+mv JobRunning JobDone
+
+echo "#############################################################################" >> $HOME/finished
+echo  `date` >> $HOME/finished
+echo  `pwd` >> $HOME/finished
+echo  "LASP" >> $HOME/finished
+echo  "  " >> $HOME/finished
+
+

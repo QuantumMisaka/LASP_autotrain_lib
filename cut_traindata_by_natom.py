@@ -1,5 +1,6 @@
 # cut TrainStr and TrainFor by Natom
 # JamesBourbon in 20220617
+# also can use to sort-by-natom
 from allstr_new import AllStr
 from structure_new import Str
 import sys
@@ -39,3 +40,6 @@ else:
 printlist = range(index_min, index_max)
 allstr_sorted.gen_data_str(printlist, STR_OUT)
 allstr_sorted.gen_data_for(printlist, FOR_OUT)
+print(f"---- Cut {len(printlist)} Structure from {db_size} Train-data ----")
+print(f"---- OutPut StrFile as {STR_OUT} ----")
+print("DONE!")
