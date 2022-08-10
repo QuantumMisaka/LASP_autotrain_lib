@@ -23,8 +23,6 @@ Python3 Script for LASP Arc or TrainStr.txt Strucuture file
 Parallel Version
 Coding by James.Misaka.Bourbon.Liu, updated in 2022-0807
 
-tips: update from patterns function have some bug
-
 ---------------------- Running Script ---------------------'''
 
 
@@ -75,7 +73,6 @@ def get_patterns_parallel(strfile:str="TrainStr.txt",filemode:int=1, init_db="",
     
 if __name__ == "__main__":
     print(INTRO)
-    print("test mode")
     start_time = time.perf_counter()
     if len(sys.argv) == 2:
         get_patterns_parallel(sys.argv[1])
