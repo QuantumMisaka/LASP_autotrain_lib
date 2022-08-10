@@ -55,7 +55,7 @@ def get_patterns_parallel(strfile:str="TrainStr.txt",filemode:int=1, init_db="",
         print(f"---- Read {init_db} database for init-patterns ----")
         patterns_obj.read_coordination_json(init_db)
     # main for-loop running
-    patterns_map_results = target_allstr.para_run(ParaWrap_Coor_Patterns, NCORE)
+    patterns_map_results = target_allstr.para_run(ParaWrap_Coor_Patterns, ncore)
     patterns_set = set()
     for result in patterns_map_results:
         result: MapResult
