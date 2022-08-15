@@ -1,4 +1,4 @@
-# JamesBourbon in 20220611
+# JamesBourbon in 20220814
 # add coordination pattern calc function
 from atom_k import S_atom 
 from bond_k import bond # not useful in LASP-autotrain
@@ -210,9 +210,11 @@ class Str(object):
 
     def set_coord(self):
         '''set self.Coord from self.atom'''
+        self.Coord = []
         for atom in self.atom:
             # atom: S_atom
             self.Coord.append(atom.xyz)
+        self.Coord = np.array(self.Coord)
             
 
     def calc_centroid(self):
@@ -608,23 +610,6 @@ class Str(object):
         iza = [atom.ele_num for atom in self.atom]
         self.c_iza  = pointer((ctypes.c_int*self.natom)(*iza))
     
-    '''
-    def calc_Q(self):
-        # cp from msc
-        self.calc_Ctypes()
-        q = ctypes.cdll.LoadLibrary('/home7/kpl/pymodule/script/Lib_Qcal/calQ.so')
-        natom = self.c_natm
-        el    = pointer(ctypes.c_double(self.energy))
-        atom  = pointer(ctypes.c_int(0))
-        sym   = pointer(ctypes.c_int(int(0)))
-        za    = self.c_iza
-        coord = self.c_xa
-        rv    = self.c_rv
-        qglobal = pointer((ctypes.c_double*4)(*[0.0,0.0,0.0,0.0]))
-        q.get_order_parameter_(natom, za, rv, coord, atom, qglobal, el, sym)
-        qval = list(qglobal.contents)[1:4]
-        return [qval[0], qval[1], qval[2]]
-    '''
 
     def JudgeBond(self):
         return
@@ -1055,8 +1040,28 @@ class Str(object):
                         self.centralize(0)
                         for j in range(self.natom) : self.Coord[j][0:3]= self.cart[j][0:3]
                         return fragment, self.Coord, self.Cell
-
-
+    # update 0814
+    def get_basic_shape(self, vac=5):
+        '''find the basic cell shape
+        
+        Returns: bulk, layer, cluster
+        '''
+        self.set_coord()
+        max_coord = np.max(self.Coord, axis=0)
+        min_coord = np.min(self.Coord, axis=0)
+        coord_space = max_coord - min_coord
+        is_vacc = (coord_space - vac - self.abc[:3]) >= 0
+        sum_vac_dim = np.sum(is_vacc)
+        if sum_vac_dim >= 3:
+            return "cluster"
+        elif sum_vac_dim >=1 :
+            return "layer"
+        else:
+            return "bulk"
+            
+            
+        
+    
 
 
     def judge_shape(self,cut=2.6):

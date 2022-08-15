@@ -1,5 +1,5 @@
 # for split arc-file to single-DFT based by lasp_pylib
-# last change by JamesBourbon in 20220801, minor update
+# last change by JamesBourbon in 20220815, 
 
 import sys
 import os
@@ -39,7 +39,12 @@ def split(arcfile, paradir='', workname="para"):
             AllStr.gen_arc([i], "lasp.str")
             os.chdir(ROOTDIR)
         else:
-            AllStr.gen_arc([i], "outstr_%d.arc"%i)
+            # for other like nn
+            workdir="%s/%s-%d"%(ROOTDIR,workname,i)
+            os.mkdir(workdir)
+            os.chdir(workdir)
+            AllStr.gen_arc([i], "lasp.str")
+            os.chdir(ROOTDIR)
     return
 
 
