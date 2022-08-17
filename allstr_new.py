@@ -692,11 +692,11 @@ class AllStr(list,Str):
                     filename => name of output arc file
                         fmode => 0 is defaule format, 1 is allstr.arc type
                             press => default is zero, else will add pressure effect
-                   
+                
             use it for get new_arc_file from allstr
             
             noted by JamesBourbon in 20220401
-                   """
+        """
         with open(filename, 'w') as fout:
             fout.write("!BIOSYM archive 2\nPBC=ON\n")
             for i in set:
@@ -724,7 +724,7 @@ class AllStr(list,Str):
                         ele = self[i].Ele_Name[j]
                         xa =  self[i].Coord[j]
                         fout.write("%-2s%18.9f%15.9f%15.9f CORE %4d %-2s %-2s   0.0000 %4d\n"%\
-                             (ele,xa[0],xa[1],xa[2],j+1,ele,ele,j+1))
+                            (ele,xa[0],xa[1],xa[2],j+1,ele,ele,j+1))
                 else :
                     cc=0
                     for ele in sorted(self[i].sp.keys() , key = lambda x: PT.Eledict[x] ):
@@ -733,7 +733,7 @@ class AllStr(list,Str):
                                 xa =  self[i].Coord[j]
                                 cc +=1
                                 fout.write("%-2s%18.9f%15.9f%15.9f CORE %4d %-2s %-2s   0.0000 %4d\n"%\
-                                     (ele,xa[0],xa[1],xa[2],cc,ele,ele,cc))
+                                    (ele,xa[0],xa[1],xa[2],cc,ele,ele,cc))
                 fout.write("end\nend\n")
 
     def gen_forarc(self, set, fname='outfor.arc',ordertype=1):
@@ -743,7 +743,7 @@ class AllStr(list,Str):
                 fout.write("For %4d  %12.6f\n"%(i+1,self[i].energy))
                 stres = self[i].stress[0:6]
                 fout.write("   %15.9f%15.9f%15.9f%15.9f%15.9f%15.9f\n" \
-                   %(stres[0],stres[1],stres[2],stres[3],stres[4],stres[5]) )
+                    %(stres[0],stres[1],stres[2],stres[3],stres[4],stres[5]) )
                 if ordertype ==1:
                     for j in range(self[i].natom):
                         xa = self[i].For[j]
@@ -759,30 +759,14 @@ class AllStr(list,Str):
                 fout.write("\n")
 
     def gen_POSCAR_VASP(self, num):
-        """ generate POSCAR, num is the num-th structure, fname is the name of output POSCAR"""
+        """ generate POSCAR, num is the num-th structure, fname is the name of output POSCAR
+        
+        refine by JamesBourbon by using str.outPOSCAR
+        """
         fname='POSCAR_'+str(num)
         #fout = open(fname, 'w')
-        with open(fname, 'w') as fout:
-        #print self[num-1].energy
-            fout.write("# Sample POSCAR %12.6f   \n" %self[num-1].energy)
-            fout.write("1.000000000000\n")
-            for x in self[num-1].Cell:
-                fout.write("   %15.8f  %15.8f  %15.8f\n"%(x[0],x[1],x[2]))
-            elename,elen ="",""
-            #print self[num-1].sporder
-#           for x in sorted(self[num-1].sporder,key = self[num-1].sporder.__getitem__):
-            for x in sorted(self[num-1].sp.keys() , key = lambda x: PT.Eledict[x]):
-                elename +="%8s"%x
-                elen +="%8d"%self[num-1].sp[x]
-            fout.write("%s\n"%elename)
-            fout.write("%s\n"%elen)
-            fout.write("Cart\n")
-#           for i in range(self[num-1].natom):
-            for ele in sorted(self[num-1].sp.keys() , key = lambda x: PT.Eledict[x]):
-                for j in range(self[num-1].natom):
-                    if self[num-1].Ele_Name[j] == ele:
-                        xa = self[num-1].Coord[j]
-                        fout.write("%15.8f  %15.8f  %15.8f\n"%(xa[0],xa[1],xa[2]))
+        self[num].outPOSCAR(fname)
+
 
     def gen_INPUT_SIESTA(self, i, dir='./'):
         """ generate INPUT_DEBUG, i is the i-th structure, dir is the path of INPUT_DEBUG.template"""
@@ -798,6 +782,7 @@ class AllStr(list,Str):
         with open(fname,'w') as fout:
                 fout.write(_data.safe_substitute(dict))
         #os.system('cp %s/*psf .'%(dir))
+
 
     def GenGIN_GULP(self, num):
         """ generate gin file, num is the num-th structure, fname is the name of output gin file"""
@@ -815,78 +800,18 @@ class AllStr(list,Str):
                 fout.write("   %2s CORE  %12.6f  %12.6f  %12.6f\n"%(ele,xa[0],xa[1],xa[2]))
             #fout.write(Tp.gulp_TiO2.safe_substitute())
 
-
-    def build_coord_set_from_POSCAR(self,filename='POSCAR'):
-        print('BuildCoordSet_fromPOSCAR')
-        index = 0; atom=-1
-        try:
-            f = open(filename,'r')
-        except:
-            print('--No POSCAR info--')
-            return None
-
-        self.append(Str())
-        self[0].Cell=[]
-        self[0].energy=0.0
-        self[0].maxF=0.0
-        self[0].Ele_Name=[]
-
-        item = f.readline()
-        if item == None: return None
-        speName=[]; speNa=[]
-        while item :
-            L = item.split()[:]
-            index += 1
-            if index > 2 and index < 6:
-                self[0].Cell.append([float(x) for x in L[0:3]])
-            if index ==6 :
-                self[0].Latt=self[0].Cell2Latt()
-                L1=L
-            if index ==7 :
-                for i in range(len(L)):
-                    self[0].sp[L1[i]]=int(L[i])
-                    speName.append(L1[i])
-                    speNa.append(int(L[i]))
-            if index==8:
-                self[0].natom = sum([x for x in self[0].sp.values()])
-                print('atoms',self[0].natom)
-                for i in range(self[0].natom):
-                    kk=1; z =0
-#                   for y,x in self[0].sp.items():
-                    for y,x in enumerate(speName):
-                        print(y, x)
-                        z += peNa[y] # ?
-                        if i-z<0 and kk==1:
-                           self[0].Ele_Name.append(x)
-                           kk=0
-                       #if kk==0: break
-                for i in range(self[0].natom):
-                    print(self[0].Ele_Name[i], i)
-
-#              print self[0].EleNam
-                if (L[0][0]=='C' or L[0][0]=='c'): Cart=1
-                if (L[0][0]=='D' or L[0][0]=='d'): Cart=0
-            if index>=9:
-               atom +=1
-               #if atom > 1+self[0].natom: break
-               if Cart==1:
-                   self[0].Coord.append([float(x) for x in L[0:3]])
-               if Cart==0:
-                   self[0].Coord.append(np.dot([float(x) for x in L[0:3]],self[0].Cell))
-               self[0].frac.append([0,0,0])
-#              self[0].Ele_Index.append(PT.Eledict[self[0].EleNam[k]])
-            item = f.readline()
-#       self[0].natom = atom+1
-#       print self[0].FracCoord()
-        self[0].frac=self[0].FracCoord()
-#       for i in range(self[0].natom):
-#           cellr=np.linalg.inv(self[0].Cell)
-#           print(self[0].Coord)
-#           self[0].frac.append(np.dot([x for x in self[0].Coord],cellr))
-
-        self[0].Cell=self[0].Latt2Cell()
-        self[0].Coord=np.dot(self[0].frac,self[0].Cell)
+    
+    def read_coord_set_from_POSCAR(self,filename='POSCAR'):
+        '''build coord set from POSCAR by using Str.build_coord_set_from_POSCAR()
         
+        re-defined by JamesBourbon
+        '''
+        print('Build_Coord_Set_from_POSCAR')
+        read_str = Str()
+        read_str.build_coord_set_from_POSCAR(filename)
+        self.append(read_str)
+        
+
     '''
     def get_all_smi_name(self,numproc=24,flag =2):
         if flag == 1:
@@ -956,8 +881,8 @@ class AllStr(list,Str):
 
     '''
 
-def ParaWrap_CoorPatterns(x):
-    return x.gen_coordination_patterns()
+# def ParaWrap_CoorPatterns(x):
+#     return x.gen_coordination_patterns()
 
 
 if __name__ == '__main__' :

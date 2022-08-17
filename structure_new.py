@@ -7,7 +7,6 @@ import PeriodicTable as PT
 import math as m
 import os
 import ctypes
-from ctypes import pointer
 import re
 from functools import reduce # in py3
 import pandas as pd
@@ -44,17 +43,13 @@ class Str(object):
         self.sporder= {} # atom ordered by element
         self.Cell = [] # lattice abc in Cartesian-3D
         self.natompe= []
-        self.eleList =[]
-        self.ele_nameList = []
+        self.eleList =[] # specific element index in Str
+        self.ele_nameList = [] # specific element in Str
         
         # relevant to force
         self.Lfor = True # have allfor.arc to read or not
         self.For= [] # list contains force of Str in each-atom-3D
         self.stress = [] # stress list ?
-        
-
-        self.nele = 0 # ?
-        self.natom = 0
 
         # self.serial_num = 0
         self.maxF = 0
@@ -138,6 +133,80 @@ class Str(object):
     def add_charge(self, base):
         for atom in self.atom:
             atom.charge = base[atom.ele_symbol]
+
+    def element_to_list(self, element_count: dict):
+        '''transfer element_count dict (Str.sp) to all_element list'''
+        element_list = []
+        ele_indexs = []
+        for element,count in element_count.items():
+            for i in range(count):
+                element_list.append(element)
+                ele_indexs.append(PT.Eledict[element])
+        all_element = element_list
+        all_ele_ind = ele_indexs 
+        return all_element, all_ele_ind
+    
+    def build_coord_set_from_POSCAR(self, filename="POSCAR"):
+        '''read POSCAR to get cell and atom coord to build a Str
+    '''
+        try:
+            f = open(filename, 'r')
+        except:
+            print('----No POSCAR info----')
+        else:
+            print("read POSCAR")
+            index = 0
+            atom_id = 0
+            coord_type_status = False
+            Cart = 0
+            for line in f:
+                L_list = line.strip().split()
+                index += 1
+                if index > 2 and index < 6:
+                    # read Cell info
+                    self.Cell.append([np.float64(x) for x in L_list])
+                if index == 6:
+                    # read element name
+                    # self.Latt = self.Cell2Latt(Cell=self.Cell)
+                    elements = L_list
+                if index == 7:
+                    # read element count and get all_element list
+                    for i in range(len(L_list)):
+                        self.ele_nameList.append(elements[i])
+                        self.eleList.append(PT.Eledict[elements[i]])
+                        self.sp[elements[i]] = int(L_list[i])
+                    # get Ele_Name and Ele_Index
+                    self.Ele_Name, self.Ele_Index = self.element_to_list(self.sp)
+                # problem: something will add line
+                if index > 7 and coord_type_status == False:
+                    # read coord type
+                    if (L_list[0][0]=="C" or L_list[0][0]=="c"): 
+                        Cart=1 # Cartesian coord
+                        coord_type_status = True
+                    if (L_list[0][0]=="D" or L_list[0][0]=="d"): 
+                        Cart=0# frac coord
+                        coord_type_status = True
+                if coord_type_status == True:
+                    # read atom coord
+                    if L_list == []: break # pick the end
+                    if len(L_list) < 3: continue
+                    if Cart == 1:
+                        cart_coord = [np.float64(x) for x in L_list[0:3]]
+                        self.Coord.append(cart_coord)
+                        self.frac = self.FracCoord()
+                    if Cart == 0:
+                        frac_coord = [np.float64(x) for x in L_list[0:3]]
+                        cart_coord = np.dot([np.float64(x) for x in L_list[0:3]], self.Cell)
+                        self.frac.append(frac_coord)
+                        self.Coord.append(cart_coord)
+                    self.atom.append(S_atom)
+                    self.atom[atom_id].xyz = cart_coord
+                    self.atom[atom_id].ele_num = self.Ele_Index[atom_id]
+                    self.atom[atom_id].ele_symbol = self.Ele_Name[atom_id]
+                    atom_id += 1    
+            self.natom = atom_id    
+            f.close()
+        return  
 
 
     def get_max_force(self):
@@ -802,6 +871,9 @@ class Str(object):
             self.bmx1D.extend(line)
 
 
+        
+        
+
 #    def GetNeighbour(self,iatom):
 #        for i in range(self.natom):
 #            if self.bmx2D[iatom][i]>0:
@@ -976,28 +1048,25 @@ class Str(object):
         cellr = np.linalg.inv(self.Cell)
         return np.dot(self.Coord,cellr)
 
-    def frac_modulo(self):
+    def frac_module(self):
         frac = self.FracCoord()
         for i,x in enumerate(frac):
             frac[i]=map(lambda y:(y+1000.0) % 1.0,frac[i])
         return frac
 
     def centralize(self,n=1):
-        if n==1 : frac = self.frac_modulo()
+        if n==1 : frac = self.frac_module()
         else:
 #           key= self.centerf.keys() ; key.sort()       #  sort by keys in dict
 #           frac = np.array([self.centerf[i] for i in key])
             frac = [self.centerf[i] for i in sorted(self.centerf.keys())]
 #       print frac
         cart = np.dot(frac,self.Cell)
-
-        #self.Cell=[[10,0,0],[0,10,0],[0,0,10]]
-
-        self.pos = np.dot([0.5,0.5,0.5],self.Cell)
+        self.central_pos = np.dot([0.5,0.5,0.5],self.Cell)
         com = []
         for i in range(3):
             com.append(sum([x[i] for x in cart])/float(self.natom))
-        self.cart = np.array([np.add(np.subtract(x,com),self.pos) for x in cart])
+        self.cart = np.array([np.add(np.subtract(x,com),self.central_pos) for x in cart])
         self.frac = np.dot(self.cart,np.linalg.inv(self.Cell))
 #       return self.frac
 
@@ -1040,28 +1109,32 @@ class Str(object):
                         self.centralize(0)
                         for j in range(self.natom) : self.Coord[j][0:3]= self.cart[j][0:3]
                         return fragment, self.Coord, self.Cell
-    # update 0814
+                    
+    # update 0814, need refinement
     def get_basic_shape(self, vac=5):
         '''find the basic cell shape
         
         Returns: bulk, layer, cluster
         '''
-        self.set_coord()
-        max_coord = np.max(self.Coord, axis=0)
-        min_coord = np.min(self.Coord, axis=0)
-        coord_space = max_coord - min_coord
-        is_vacc = (coord_space - vac - self.abc[:3]) >= 0
-        sum_vac_dim = np.sum(is_vacc)
-        if sum_vac_dim >= 3:
+        if (self.abc[0] == self.abc[1] == self.abc[2]
+            ) and (self.abc[3] == self.abc[4] == self.abc[5]
+            ) and self.abc[0] >= 10:
             return "cluster"
-        elif sum_vac_dim >=1 :
-            return "layer"
         else:
-            return "bulk"
+            # not enough, need to place the cell in center
+            self.set_coord()
+            max_coord = np.max(self.Coord, axis=0)
+            min_coord = np.min(self.Coord, axis=0)
+            coord_space = max_coord - min_coord
+            is_vacc = (coord_space - vac - self.abc[:3]) >= 0
+            sum_vac_dim = np.sum(is_vacc)
+            if sum_vac_dim >= 3:
+                return "cluster"
+            elif sum_vac_dim >=1:
+                return "layer"
+            else:
+                return "bulk"
             
-            
-        
-    
 
 
     def judge_shape(self,cut=2.6):
@@ -1080,7 +1153,7 @@ class Str(object):
                     if (i==0 and j==0 and k==0): continue
                     V.append([i,j,k])
                     com = np.dot(np.add([0.5,0.5,0.5],[i,j,k]),self.Cell)
-                    Vcom[str(i)+str(j)+str(k)]=np.subtract(com,self.pos)
+                    Vcom[str(i)+str(j)+str(k)]=np.subtract(com,self.central_pos)
 
         line = False ; layer = False; solid = False; count =0
         normalvector =[]; cellconnect ={}
@@ -1091,43 +1164,43 @@ class Str(object):
                 line = True
                 layer_hole_detect=[]
                 for j0,j1,j2 in V :
-                     if i0==j0 and i1==j1 and i2==j2: continue
-                     angle=self.vect_angle(Vcom[str(i0)+str(i1)+str(i2)],Vcom[str(j0)+str(j1)+str(j2)])
-                     if abs(angle-90) < 70:
-                         if not str(j0)+str(j1)+str(j2) in cellconnect.keys():
-                             cellconnect[str(j0)+str(j1)+str(j2)] = self.cell_bondconnect(cut,[j0,j1,j2])
-                         if cellconnect[str(j0)+str(j1)+str(j2)]:
-                             layer_hole_detect.append(angle)
-                             layer = True
-                             VectorC = np.cross(Vcom[str(i0)+str(i1)+str(i2)],Vcom[str(j0)+str(j1)+str(j2)])
-                             for i in range(len(normalvector)-1):
-                                 for j in range(i+1,len(normalvector)):
-                                     angle=self.vect_angle(normalvector[i],normalvector[j])
-                                     if angle > 40:
-                                         return {"solid":7777}   # early break if two intercected layer identified
-                             angle=0.0
-                             for i in range(len(normalvector)): angle=max(angle,self.vect_angle(normalvector[i],VectorC))
-                             if len(normalvector)>1 and angle < 10: break
-                             normalvector.append(VectorC)
-                             hole_detect=[]
-                             for k0,k1,k2 in V :
-                                  if k0==i0 and k1==i1 and k2==i2: continue
-                                  if k0==j0 and k1==j1 and k2==j2: continue
-                                  angle=self.vect_angle(Vcom[str(k0)+str(k1)+str(k2)],VectorC)
-                                  if angle < 70:
-                                      if not str(k0)+str(k1)+str(k2) in cellconnect.keys():
-                                          cellconnect[str(k0)+str(k1)+str(k2)] = self.cell_bondconnect(cut,[k0,k1,k2])
-                                      if cellconnect[str(k0)+str(k1)+str(k2)]:
-                                         hole_detect.append(angle)
-                             #------THIRD LOOP END----
-                             #print hole_detect
-                             if len(hole_detect) ==0 :
-                                 return {"layer":7777}
-                             elif (max(hole_detect)-min(hole_detect)) < 15:
-                                 return {"solid-largehole":9999}
-                             elif (max(hole_detect)-min(hole_detect)) < 35:
-                                 return {"solid-smallhole":8888}
-                             else : return {"solid-dense":6666}
+                    if i0==j0 and i1==j1 and i2==j2: continue
+                    angle=self.vect_angle(Vcom[str(i0)+str(i1)+str(i2)],Vcom[str(j0)+str(j1)+str(j2)])
+                    if abs(angle-90) < 70:
+                        if not str(j0)+str(j1)+str(j2) in cellconnect.keys():
+                            cellconnect[str(j0)+str(j1)+str(j2)] = self.cell_bondconnect(cut,[j0,j1,j2])
+                        if cellconnect[str(j0)+str(j1)+str(j2)]:
+                            layer_hole_detect.append(angle)
+                            layer = True
+                            VectorC = np.cross(Vcom[str(i0)+str(i1)+str(i2)],Vcom[str(j0)+str(j1)+str(j2)])
+                            for i in range(len(normalvector)-1):
+                                for j in range(i+1,len(normalvector)):
+                                    angle=self.vect_angle(normalvector[i],normalvector[j])
+                                    if angle > 40:
+                                        return {"solid":7777}   # early break if two intercected layer identified
+                            angle=0.0
+                            for i in range(len(normalvector)): angle=max(angle,self.vect_angle(normalvector[i],VectorC))
+                            if len(normalvector)>1 and angle < 10: break
+                            normalvector.append(VectorC)
+                            hole_detect=[]
+                            for k0,k1,k2 in V :
+                                if k0==i0 and k1==i1 and k2==i2: continue
+                                if k0==j0 and k1==j1 and k2==j2: continue
+                                angle=self.vect_angle(Vcom[str(k0)+str(k1)+str(k2)],VectorC)
+                                if angle < 70:
+                                    if not str(k0)+str(k1)+str(k2) in cellconnect.keys():
+                                        cellconnect[str(k0)+str(k1)+str(k2)] = self.cell_bondconnect(cut,[k0,k1,k2])
+                                    if cellconnect[str(k0)+str(k1)+str(k2)]:
+                                        hole_detect.append(angle)
+                            #------THIRD LOOP END----
+                            #print hole_detect
+                            if len(hole_detect) ==0 :
+                                return {"layer":7777}
+                            elif (max(hole_detect)-min(hole_detect)) < 15:
+                                return {"solid-largehole":9999}
+                            elif (max(hole_detect)-min(hole_detect)) < 35:
+                                return {"solid-smallhole":8888}
+                            else : return {"solid-dense":6666}
 
                 #        else: continue  ------SECOND LOOP END----
                 # the following info on layer should not be met due to the early return above
@@ -1168,7 +1241,7 @@ class Str(object):
        else:
            fract0 = self.frac
            cart0  = self.cart
-           pos    = self.pos
+           pos    = self.central_pos
 
        d0=999
        for i in range(N):
@@ -1181,7 +1254,7 @@ class Str(object):
 
     def neighbor(self,at,cut=2.6):
         """ find the shortest bond neighbors of atom  """
-        frac = self.frac_modulo()
+        frac = self.frac_module()
         cart = np.dot(frac,self.Cell)
         cart0= np.dot(at.values()[0],self.Cell)
         N=self.natom   #len(cart)
@@ -1220,7 +1293,7 @@ class Str(object):
 
     def Shortestbond(self):
         """ find the shortest bond """
-        frac = self.frac_modulo()
+        frac = self.frac_module()
         cart = np.dot(frac,self.Cell)
         N=self.natom   #len(cart)
         bonddict={}
