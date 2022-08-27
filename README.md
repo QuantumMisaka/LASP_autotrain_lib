@@ -1,13 +1,13 @@
 # LASP SSW-DFT-NN auto-train python-lib
 
 ## Author
-Original: ZPLiu's Group (SDHuang, ZPLiu et al)
-
 Modified: James.Misaka.Bourbon.Liu
 
-Last Change: 2022-07-14
+Original: ZPLiu's Group (SDHuang, SCMa, ZPLiu et. al.)
 
-Version: V1.1
+Last Update: 2022-08-27
+
+Version: V1.2.2
 
 ## Program Structure
 
@@ -18,7 +18,30 @@ Version: V1.1
 ![auto_workflow](image/auto_workflow.png)
 
 
-## How to run it directly
+## Requirement
+
+Python 3.6+ (better 3.8)
+
+NumPy, matplotlib, Pandas. Scipy, multiprocessing et. al.
+
+Miniconda or Anaconda to construct Python-3.8 env is recommended
+
+Original LASP_PythonLib use Python-2.7, which is TOTALLY OUT-Of-DATE
+
+## Function
+
+1. SSW-NN-autotrain Machine Learning Potentials of LASP.
+2. python (and shell/fortran) scripts which can be used in LASP Calculation. e.g:
+   1. vasp2lasptrain.py transfer VASP-label result to TrainStr.txt and TrainFor.txt. (independently)
+   2. shiftformat.py transfer between arc-file and Traindata-file. (independently)
+   3. traindata_analysis.py to give infomation of TrainStr.txt and TrainFor.txt.
+   4. splitarc_auto.py to split muti-struc-arcfile to each input.arc(lasp.str) or DFT_label_inputfile.
+   5. pos_arc_shift.py transfer between POSCAR and struc-arc-file.
+   6. shellscript in little_script dir.
+   7. computeQ.py for calculate dafa for PlotQE usage.
+
+
+## How to run SSW-NN-autotrain and auto.py
 
 ### 1. modify console file
 

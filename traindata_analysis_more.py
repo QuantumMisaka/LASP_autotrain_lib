@@ -1,6 +1,7 @@
 # analysis traindata
 # JamesBourbon update in 20220815
 # more infomation get from train-data
+# not refined, not good
 from distutils.log import INFO
 from allstr_new import AllStr
 from structure_new import Str
