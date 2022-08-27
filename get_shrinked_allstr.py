@@ -1,9 +1,8 @@
-# get shrinked AlllStr from init AllSTr/TrainStr
+# get shrinked AlllStr from init AllStr/TrainStr
 # for refine LASP Train-data
-# JamesBourbon update in 20220815
+# JamesBourbon update in 20220827: soft/hard method can use together
 
 import sys
-import os
 import random as rd
 import copy
 from allstr_new import AllStr
@@ -12,11 +11,13 @@ import numpy as np
 
 STRFILE = "TrainStr_init.txt"
 FILETYPE = 1
-SHRINK_NUM = 20
-RATIO_RANGE = [0.68, 0.86] # shrick ratio limit
+SOFT_NUM = 6
+HARD_NUM = 6
+RATIO_RANGE = [0.7, 0.9] # shrick ratio limit
 # only 1st str will be used
 
-def shrink(init_str: Str, ratio_range=RATIO_RANGE):
+def shrink_soft(init_str: Str, ratio_range=RATIO_RANGE):
+    '''shrink init-structure by fractional coordination'''
     output_str = copy.deepcopy(init_str)
     # you can figure out why use deep-copy
     for index, vector in enumerate(output_str.abc[:3]):
@@ -32,12 +33,27 @@ def shrink(init_str: Str, ratio_range=RATIO_RANGE):
             atom.xyz = np.dot(frac[i], output_str.Cell)
         output_str.set_coord()
     return output_str
+
+def shrink_hard(init_str: Str, ratio_range=RATIO_RANGE):
+    '''shrink init-structure by Cartesian coordination'''
+    output_str = copy.deepcopy(init_str)
+    for index, vector in enumerate(output_str.abc[:3]):
+        # output_str.set_coord()
+        ratio = rd.uniform(ratio_range[0], ratio_range[1])
+        output_str.abc[index] = vector * ratio
+        output_str.Latt = output_str.abc
+        # abc and Latt problem should find a time to sort out -- tips
+        output_str.Cell = output_str.Latt2Cell()
+    return output_str
+        
         
     
-def main(strfile, shrink_num = SHRINK_NUM, file_type = FILETYPE):
+def main(strfile, soft_num = SOFT_NUM, hard_num = HARD_NUM ,file_type = FILETYPE):
     print("---- Running Shrinking Script ---- ")
     allstr_raw = AllStr()
-    allstr_shrink = AllStr()
+    allstr_shrink_soft = AllStr()
+    allstr_shrink_hard = AllStr()
+    # find input-str type and read file
     if strfile[-4:] == '.txt':
         print("input file is TrainStr file, file_type = 1") 
         file_type = 1
@@ -48,19 +64,26 @@ def main(strfile, shrink_num = SHRINK_NUM, file_type = FILETYPE):
         print("input file type not detect")
         print(f"use default setting file_type = {file_type}")
     if file_type == 0:
-        allstr_raw.arcinit(strfile=strfile) 
+        allstr_raw.arcinit(strfile=strfile, forfile="") 
     elif file_type == 1:
         allstr_raw.train_data_init(strfile)
-    
+    # itered shrink it by soft/hard
     init_str = allstr_raw[0]
-    for i in range(shrink_num):
-        shrink_str = shrink(init_str)
-        allstr_shrink.append(shrink_str)
-    # print as shrink_allstr.arc
-    output_file = 'shrink_allstr.arc'
-    allstr_shrink.gen_arc(range(shrink_num), output_file)
-    print(f"---- Generated {shrink_num} shrinked sturcture in {output_file} ----")
+    for i in range(soft_num):
+        soft_shrink_str = shrink_soft(init_str)
+        allstr_shrink_soft.append(soft_shrink_str)
+    for i in range(hard_num):
+        hard_shrink_str = shrink_hard(init_str)
+        allstr_shrink_hard.append(hard_shrink_str)
+    # print as shrinked.arc
+    output_file_soft = 'soft_shrinked.arc'
+    output_file_hard = 'hard_shrinked.arc'
+    allstr_shrink_soft.gen_arc(range(soft_num), output_file_soft)
+    print(f"---- Generated {soft_num} shrinked sturcture in {output_file_soft} ----")
+    allstr_shrink_hard.gen_arc(range(hard_num), output_file_hard)
+    print(f"---- Generated {hard_num} shrinked sturcture in {output_file_hard} ----")
     print("DONE!")
+    
     
 if __name__ == "__main__":
     argnum = len(sys.argv)
@@ -71,11 +94,18 @@ if __name__ == "__main__":
         print("---- Target File is Specified ----")
         main(strfile=sys.argv[1])
     elif argnum == 3:
-        print("---- Target File and Shrink_num is Specified ----")
-        main(strfile=sys.argv[1], shrink_num=eval(sys.argv[2]))
+        print("---- Target File and soft_num is Specified ----")
+        print("---- hard num will equal to soft num ----")
+        main(strfile=sys.argv[1], soft_num=eval(
+            sys.argv[2]), hard_num=eval(sys.argv[2]))
+    elif argnum == 4:
+        print("---- Target File and soft/hard_num is Specified ----")
+        main(strfile=sys.argv[1], soft_num=eval(
+            sys.argv[2]), hard_num=eval(sys.argv[3]))
     else:
         print("---- All Parameter is Specified! ----")
-        main(sys.argv[1], eval(sys.argv[2]), eval(sys.argv[3]))
+        main(sys.argv[1], eval(sys.argv[2]), 
+                eval(sys.argv[3]), eval(sys.argv[4]))
     
         
     
