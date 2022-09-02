@@ -30,7 +30,7 @@ if __name__ == "__main__":
     if sys.argv[1] == "pos2arc":
 # POSCAR to arc
         allstr_read.read_coord_set_from_POSCAR(POSCAR)
-        allstr_read.gen_arc([0],'outstr.arc',2)
+        allstr_read.print_str_all('outstr.arc')
     if sys.argv[1] == "arc2pos":
 #  arc to POSCAR: can be multiple
         allstr_read.arcinit([0,0],ARC_INPUT)  

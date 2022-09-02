@@ -1,6 +1,7 @@
 # noting by JamesBourbon
 # last change in 20220730
 # from atom_k import S_atom
+from operator import index
 from structure_new import Str
 from structure_new import wrapCalBondMatrix, wrapSegmolecular,wrapCalFakebmx, BadStr, FooError, ParaWrap_JudgeShape, ParaWrap_Shortestbond
 from structure_new import ParaWrap_ChemicalFormula
@@ -18,11 +19,14 @@ import string
 from functools import reduce
 
 
-class AllStr(list,Str):
-#    def __init__(self):
-#        list.__init__(self)
-
-    def readfile(self,inputfile, forcefile=False, allformat = 0):
+class AllStr(list):
+    # element:Str
+    # def __init__(self):
+    #     list.__init__(self)
+    #     self.strlen = 0
+    
+    # arcfile read 1st
+    def read_arc(self,inputfile, forcefile=False, allformat = 0):
         '''read allstr.arc (and allfor.arc) file
             used in VASP.run()
             
@@ -50,25 +54,22 @@ class AllStr(list,Str):
                     if self[currentStr].energy.is_integer():
                         self[currentStr].energy = float(line.split()[-2])
                         self[currentStr].maxF = float(line.split()[-3])
-
-
                 except:
                     self[currentStr].maxF = 990
                     if '***' not in line:
                         self[currentStr].energy = float(line.split()[-2])
                     else: 
                         self[currentStr].energy = 990
+            elif 'Materials Studio' in line:
+                currentStr +=  1
+                self[currentStr].Lfor = False
+                self[currentStr].energy = 0
+                self.maxF = 0
             elif 'CORE' in line:
-                self[currentStr].addatom(line,1 )
+                self[currentStr].addatom(line, 1 )
             elif ('PBC' in line ) and ('ON' not in line):
-                self[currentStr].abc= [float(x) for x in line.split()[1:]]
+                self[currentStr].Latt= [float(x) for x in line.split()[1:]]
         f.close()
-        for str in self:
-            # str is Str object in structure_new.py
-            str.sort_atom_by_element()
-            str.get_atom_num()
-            str.abc2lat()
-
         if forcefile:
             f = open(forcefile,'r')
             currentStr= -1
@@ -84,15 +85,203 @@ class AllStr(list,Str):
                     if "****" not in line: self[currentStr].add_force(line, iatom)
                     else:                  self[currentStr].add_force('0.0 0.0 0.0', iatom)
                     iatom += 1
-
+            f.close()
+        # str normalization
+        for str in self:
+            str: Str
+            str.sort_atom_by_element()
+            str.get_atom_num()
+            str.set_coord()
+            str.Cell = str.Latt2Cell()
+            if str.Lfor:
+                str.set_for_list()
         if allformat:
             for str in self:
-                str.TransferToXYZcoordStr()
+                str: Str
+                # str.TransferToXYZcoordStr() # not use
 
-    def screen_upper(self):
+    # arcfile read 2nd
+    def build_coord_set(self, onestr=[0, 0], filename='allstr.arc'):
+        '''bulid coordinate to Str.atom from allstr.arc file
+        
+        update in 20220902 by JamesBourbon      
+        '''
+        print('Build_Coord_Set')
+        ind_getstr = -1  # str found, can be range in 'onestr'
+        index_str = -1  # str added-in
+        for line in open(filename):
+            item = line.split()[:]  # line: list
+            # head line
+            if ('Energy' in item
+                or 'SSW-fixlat' in item
+                or 'SSW-Crystal' in item
+                or 'Str' in item
+                    or 'React' in item):
+                ind_getstr += 1
+                if onestr[1] == 0 or ind_getstr in range(onestr[0], onestr[1]):
+                    index_str += 1
+                    append_str = Str()
+                    if 'from' not in item:
+                        try:
+                            append_str.energy = float(line.split()[-1])
+                            mk = -2
+                            if append_str.energy.is_integer():
+                                append_str.energy = float(
+                                    line.split()[-2])
+                                mk = -3
+                            try:
+                                append_str.maxF = float(line.split()[mk])
+                            except:
+                                append_str.maxF = 990
+                        except:
+                            try:
+                                append_str.energy = float(
+                                    line.split()[-2])
+                                append_str.maxF = float(line.split()[-3])
+                            except:
+                                append_str.energy = 1
+                                append_str.maxF = 990
+                    else:
+                        append_str.energy = float(line.split()[-4])
+                    self.strlen = index_str + 1
+                    append_str.Lfor = False
+                    ele_order = 1
+                    self.append(append_str)
+            elif 'Materials Studio' in line:
+                # read from MS-gen-ed CAR file
+                ind_getstr += 1
+                if onestr[1] == 0 or ind_getstr in range(onestr[0], onestr[1]):
+                    index_str += 1
+                    append_str = Str()
+                    append_str.energy = 0
+                    append_str.maxF = 0
+                    self.strlen = index_str + 1
+                    append_str.Lfor = False
+                    ele_order = 1
+                    self.append(append_str)
+            # Latt line
+            if 'PBC' in line and 'ON' not in line \
+                    and (onestr[1] == 0 or ind_getstr in range(onestr[0], onestr[1])):
+                try:
+                    self[index_str].Latt = [float(x)
+                                            for x in line.split()[1:7]]
+                except:
+                    self[index_str].Latt = [99, 99, 99, 90, 90, 90]
+            # atom line: add coord to atom, not to self.Coord
+            if 'CORE' in line and (onestr[1] == 0 or ind_getstr in range(onestr[0], onestr[1])):
+                atom_ind = self[index_str].natom
+                try:
+                    self[index_str].addatom(line)  # add info to atoms
+                except:
+                    self[index_str].addatom('NaN 0 0 0')
+                self[index_str].Ele_Name.append(item[0])
+                self[index_str].Ele_Index.append(
+                    PT.Eledict[self[index_str].Ele_Name[atom_ind]])
+                # self[index_str].eleList, self[index_str].natompe = list(np.unique([atom.ele_num for atom in self[index_str].atom], return_counts=True))
+                # self[index_str].ele_nameList = [PT.Eletable[ele_num-1] for ele_num in self[index_str].eleList]
+                if self[index_str].Ele_Name[atom_ind] not in self[index_str].Ele_Name[:atom_ind]:
+                    # find new element species
+                    self[index_str].sp[self[index_str].Ele_Name[atom_ind]] = 1
+                    self[index_str].sporder[self[index_str].Ele_Name[atom_ind]] = ele_order
+                    ele_order += 1
+                else:
+                    # add number of atom in same element species
+                    self[index_str].sp[self[index_str].Ele_Name[atom_ind]] += 1
+                self[index_str].natom += 1  # update natom and atom_ind
+
+        
+    def build_for_set(self, onestr=[0, 0], filename='allfor.arc'):
+        '''bulid force set from allfor.arc file
+            if allfor.arc not exist, return None
+        
+        update by JamesBourbon in 20220902'''
+
+        print('Build_For_Set')
+        index_str = -1
+        ind_getstr = -1
+        try:
+            f = open(filename, 'r')
+        except:
+            print('--No force info--')
+            return None
+        line = f.readline()
+        if line == None:
+            print('--No force info--')
+            return None
+        while line:
+            item = line.split()[:]
+            if ('For' in item):
+                #print index,self[index+1].energy
+                if onestr[1] == 0 or ind_getstr+1 in range(onestr[0], onestr[1]):
+                    if 'from' not in item:
+                        err = float(line.split()[-1]) - \
+                            self[index_str+1].energy
+                    else:
+                        err = float(line.split()[-4]) - \
+                            self[index_str+1].energy
+                #print float(item.split()[-1]), self[index+1].energy, e
+                    if (err > 1e-5):
+                        print(index_str+1, float(line.split()
+                                                [-1]), self[index_str+1].energy, err)
+                        raise FooError('Error: incompatible Str with For')
+                    else:
+                        ind_getstr += 1
+                        index_str += 1
+                        self[index_str].Lfor = True
+                        stress_line = f.readline()
+                        if '**' not in stress_line:
+                            try:
+                                self[index_str].add_stress(stress_line)
+                            except:
+                                self[index_str].stress = [99999, 99999,
+                                                        99999, 99999, 99999, 99999]
+                        else:
+                            self[index_str].stress = [99999, 99999,
+                                                    99999, 99999, 99999, 99999]
+                        self[index_str].maxF = 0.0
+                        for i in range(self[index_str].natom):
+                            for_line = f.readline()
+                            if '**' not in for_line:
+                                try:
+                                    self[index_str].add_force(for_line, i)
+                                    # self[index_str].For.append(list(float(x) for x in strfor.split()[:3]))
+                                except:
+                                    self[index_str].add_force(
+                                        "999999 999999 999999", i)
+                                    # self[index_str].For.append([999999, 999999, 99999])
+
+                            else:
+                                self[index_str].add_force(
+                                    "999999 999999 999999", i)
+                                # self[index_str].For.append([999999, 999999, 99999])
+                            self[index_str].maxF = max(self[index_str].maxF, max(
+                                map(abs, [x for x in self[index_str].atom[i].force])))
+            line = f.readline()
+
+    def arcinit(self, ind=[0, 0], strfile='allstr.arc', forfile='allfor.arc', allformat=0):
+        '''init arcfile" read allstr and allfor(if exist)'''
+        self.build_coord_set(
+            ind, strfile)  # build coordinate set from allstr.arc
+        self.build_for_set(ind, forfile)  # build force set from allfor.arc
         for str in self:
-            str.screenuppersurf()
+            str: Str
+            str.sort_atom_by_element()  # need to sort-arange
+            str.get_atom_num()
+            str.set_coord()
+            str.Cell = str.Latt2Cell()
+            if str.Lfor:
+                str.set_for_list()
+        if allformat:
+            for str in self:
+                try:
+                    str.TransferToKplstr()  # not need
+                except:
+                    # print(str.energy)# always turn to this
+                    continue
 
+
+
+    # train-data read
     def train_data_init(self, strfile, forcefile= False):
         '''for read train_format data to AllStr object'''
         print("read from TrainStr (and TrainFor)")
@@ -110,15 +299,16 @@ class AllStr(list,Str):
             elif 'Energy' in item:
                 self[currentStr].energy= float(item.split()[2])
             elif 'lat' in item:
-                self[currentStr].Cell.append([float(x) for x in item.split()[1:4]])
+                self[currentStr].Cell.append([
+                        float(x) for x in item.split()[1:4]])
             elif 'ele' in item and 'element' not in item:
                 self[currentStr].addatom(item, 2 )
 
         self.numstr = currentStr + 1
         for i in range(self.numstr):
+            # self[i].sort_atom_by_element() # need to read force before
             self[i].get_atom_num()
-            self[i].sort_atom_by_element()
-            self[i].lat2abc()
+            self[i].Cell2Latt()
             self[i].set_coord()
         # print(self[i].natom)
         print("TrainStr has read!")        
@@ -138,21 +328,16 @@ class AllStr(list,Str):
             for i in range(self.numstr):
                 self[i].get_max_force()
             print("TrainFor has read!")
+            
+        for i in range(self.numstr):
+            self[i].sort_atom_by_element() # need to read force before
 
-    def get_all_element(self):
-        '''get all element in all_str'''
-        elements = set()
-        for struc in self:
-            elements.update(tuple(struc.sp.keys()))
-        return elements
-        
-      
-    def shuffle(self, shuffletime):
-        """ shuffle structures"""
-        for i in range(shuffletime): random.shuffle(self)
     
-    def print_all(self,outfile):
-        '''print All Str to arcfile-format, output is outfile'''
+    # print file
+    def print_str_all(self,outfile='outstr.arc'):
+        '''print All-Str by str.atom to arcfile-format, output is outfile
+        
+        substitute for gen_arc'''
         f = open(outfile,'w')
         f.write('!BIOSYM archive 2\n')
         f.write('PBC=ON\n')
@@ -164,7 +349,7 @@ class AllStr(list,Str):
             f.write('     Energy     %8d    %8d     %12.6f\n'%(istr,istr,str.energy))
             f.write('!DATE\n')
             f.write('PBC %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f\n'%
-                    (str.abc[0],str.abc[1],str.abc[2],str.abc[3],str.abc[4],str.abc[5]))
+                    (str.Latt[0],str.Latt[1],str.Latt[2],str.Latt[3],str.Latt[4],str.Latt[5]))
             #f.write('PBC %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f\n'%(100,100,100,90,90,90))
             for i,atom in enumerate(str.atom):
                 f.write('%-3s %15.9f %15.9f %15.9f CORE %4d %2s %2s %8.4f %4d\n' %
@@ -172,8 +357,8 @@ class AllStr(list,Str):
             f.write('end\nend\n')
 
 
-    def print_list(self, printlist, outfile):
-        '''print selected Str to outfile in arc_format
+    def print_str(self, printlist, outfile):
+        '''print selected Str by atom to outfile in arc_format
                 select in printlist
         
         same function as gen_arc, but outfile can be designated
@@ -187,7 +372,7 @@ class AllStr(list,Str):
             f.write('     Energy     %8d    %8d     %12.6f\n'%(istr,istr,str.energy))
             f.write('!DATE \n')
             f.write('PBC %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f\n'%
-                    (str.abc[0],str.abc[1],str.abc[2],str.abc[3],str.abc[4],str.abc[5]))
+                    (str.Latt[0],str.Latt[1],str.Latt[2],str.Latt[3],str.Latt[4],str.Latt[5]))
             #f.write('PBC %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f\n'%(100,100,100,90,90,90))
             for i,atom in enumerate(str.atom):
                 f.write('%-3s %15.9f %15.9f %15.9f CORE %4d %2s %2s %8.4f %4d\n' %
@@ -195,7 +380,8 @@ class AllStr(list,Str):
             f.write('end\nend\n')
         return
 
-    def print_for(self,printlist,outfile, flag= False):
+    def print_for(self,printlist,outfile='outfor.arc', flag= False):
+        '''print outfor.arc from AllStr(Str) by atom'''
         fout = open(outfile, "w")
         for istr in printlist:
             str = self[istr]
@@ -215,7 +401,7 @@ class AllStr(list,Str):
 
 
     def gen_data_str(self, printlist, fname):
-        '''generate str data for NNtrain
+        '''generate str data by str.atom for NNtrain
         
         used in VASP-DFT arc2train
         
@@ -235,12 +421,12 @@ class AllStr(list,Str):
                     fout.write("lat %15.8f  %15.8f  %15.8f\n"%(lat[0], lat[1], lat[2]))
                 for atom in str.atom:
                     fout.write("ele %4s %15.8f  %15.8f  %15.8f  %15.8f\n"%(
-                           atom.ele_num, atom.xyz[0], atom.xyz[1], atom.xyz[2], atom.charge))
+                            atom.ele_num, atom.xyz[0], atom.xyz[1], atom.xyz[2], atom.charge))
                 fout.write(" End one structure\n\n")
 
 
     def gen_data_for(self,printlist ,fname):
-        '''generate force data for NNtrain
+        '''generate force data by atom for NNtrain
         
         used in VASP-DFT arc2train
         '''
@@ -256,8 +442,139 @@ class AllStr(list,Str):
                         atom.ele_num, atom.force[0], atom.force[1], atom.force[2]))
                 fout.write(" End one structure\n\n")
                 
+
+    # problem will from not use Str.atom
+    def gen_arc(self, set, filename='outstr.arc',):   # ,fmode=0, dirname='test', HydraPre=False):
+        """ generate new arc file, set   => list (ot iter) of structure want to output
+                    filename => name of output arc file
+                        fmode => 0 is defaule format, 1 is allstr.arc type
+                            press => default is zero, else will add pressure effect
                 
+            use it for get new_arc_file from AllStr(Str) (not from Str.atom)
+            
+            noted by JamesBourbon in 20220902
+        """
+        with open(filename, 'w') as fout:
+            fout.write("!BIOSYM archive 2\nPBC=ON\n")
+            for i in set:
+                energy = self[i].energy
+# PV adding but not use
+#               if HydraPre:     energy = self[i].energy + self[i].Volume * HydraPre / 160.2176487
+#               else:         energy = self[i].energy
+                if not self[i].Lfor:
+                    fout.write(
+                        "\t\t\t\tEnergy\t%8d        -0.0000  %17.6f\n" % (i+1, energy))
+                else:
+                    fout.write("\t\t\t\tEnergy\t%8d        %10.6f  %17.6f\n" % (
+                        i+1, self[i].maxF, energy))
+
+# arc_file mode to give different head (not used)
+#                if fmode==0 :  fout.write("\t\t\t\tEnergy\t%8d        %10.6f  %17.6f\n"%(i+1,self[i].maxF,energy))
+#                elif fmode==2:
+#                fout.write("\t\t\t\tEnergy\t%8d        %8.4f %17.6f\n"%(i, self[i].q2, energy))
+#                elif fmode==1:
+#                    fout.write("  Str\t%8d  %8d  SSW-fixlat   %12.6f\n"%(self[i].numsym,i,self[i].energy))
+#                elif fmode==8:
+#                    fout.write("  Str\t%8d  %8d  SSW-fixlat   %12.6f   from %s\n"%(self[i].numMinimum,self[i].numStr, self[i].energy, dirname))
+                fout.write("!DATE\n")
+
+                lat = self[i].Latt
+                if not lat:
+                    lat = self[i].Cell2Latt()
+                fout.write("PBC  %12.6f%12.6f%12.6f%12.6f%12.6f%12.6f\n" %
+                        (lat[0], lat[1], lat[2], lat[3], lat[4], lat[5]))
+                try:
+                    # default: read from Str.atom
+                    for i,atom in enumerate(str.atom):
+                        fout.write('%-3s %15.9f %15.9f %15.9f CORE %4d %2s %2s %8.4f %4d\n' %
+                        (atom.ele_symbol, atom.xyz[0], atom.xyz[1], atom.xyz[2],
+                            i+1, atom.ele_symbol, atom.ele_symbol, atom.charge, i+1))
+                except:
+                    # if order-ed by Str.sort_by_ele
+                    for j in range(self[i].natom):
+                        ele_name = self[i].Ele_Name[j]
+                        coord = self[i].Coord[j]
+                        fout.write("%-2s%18.9f%15.9f%15.9f CORE %4d %-2s %-2s   0.0000 %4d\n" %
+                                (ele_name, coord[0], coord[1], coord[2], j+1, ele_name, ele_name, j+1))
+                fout.write("end\nend\n")
+
+    def gen_forarc(self, set, fname='outfor.arc'):
+        """ generate new For arc file
+        
+        use it for get new_arc_file from AllStr(Str) (not from Str.atom)
+            
+        noted by JamesBourbon in 20220902    
+        """
+        with open(fname, 'w') as fout:
+            for i in set:
+                fout.write("For %4d  %12.6f\n" % (i+1, self[i].energy))
+                stres = self[i].stress[0:6]
+                fout.write("   %15.9f %15.9f %15.9f %15.9f %15.9f %15.9f\n"
+                            % (stres[0], stres[1], stres[2], stres[3], stres[4], stres[5]))
+                try:
+                    for atom in str.atom:
+                        fout.write("   %15.9f %15.9f %15.9f\n"%(atom.force[0], atom.force[1], atom.force[2]))
+                except:
+                    for j in range(self[i].natom):
+                        for_axis = self[i].For[j]
+                        fout.write("   %15.9f %15.9f %15.9f \n" %(for_axis[0], for_axis[1], for_axis[2]))
+                fout.write("\n")
                 
+
+    def gen_POSCAR_VASP(self, num):
+        """ generate POSCAR, num is the num-th structure, fname is the name of output POSCAR
+        
+        refine by JamesBourbon by using str.outPOSCAR
+        """
+        fname = 'POSCAR_'+str(num)
+        #fout = open(fname, 'w')
+        self[num].outPOSCAR(fname)
+
+
+    def gen_INPUT_SIESTA(self, i, dir='./'):
+        """ generate INPUT_DEBUG, i is the i-th structure, dir is the path of INPUT_DEBUG.template"""
+        fname = 'INPUT_DEBUG_'+str(i)
+        dict = {}
+        dict['NumberOfAtoms'] = str(self[i-1].natom)
+        dict['NumberOfSpecies'] = str(len(self[i-1].sp))
+        dict['cell'] = self[i-1].printCell()
+        dict['coord'] = self[i-1].printCoord()
+        #print dict
+        with open('%s/INPUT_DEBUG.template' % (dir)) as ftemp:
+            _data = string.Template(ftemp.read())
+        with open(fname, 'w') as fout:
+            fout.write(_data.safe_substitute(dict))
+        #os.system('cp %s/*psf .'%(dir))
+
+    def GenGIN_GULP(self, num):
+        """ generate gin file, num is the num-th structure, fname is the name of output gin file"""
+        fname = 'test.gin_'+str(num)
+        with open(fname, 'w') as fout:
+            fout.write("conp md\n")
+            fout.write("vector\n")
+            for x in self[num-1].Cell:
+                fout.write("   %15.8f  %15.8f  %15.8f\n" % (x[0], x[1], x[2]))
+            fout.write("cart\n")
+
+            for i in range(self[num-1].natom):
+                xa = self[num-1].Coord[i]
+                ele = self[num-1].Ele_Name[i]
+                fout.write("   %2s CORE  %12.6f  %12.6f  %12.6f\n" %
+                            (ele, xa[0], xa[1], xa[2]))
+            #fout.write(Tp.gulp_TiO2.safe_substitute())
+
+
+    def read_coord_set_from_POSCAR(self, filename='POSCAR'):
+        '''build coord set from POSCAR by using Str.build_coord_set_from_POSCAR()
+        
+        re-defined by JamesBourbon
+        '''
+        print('Build_Coord_Set_from_POSCAR')
+        read_str = Str()
+        read_str.build_coord_set_from_POSCAR(filename)
+        self.append(read_str)
+
+
     def gen_coordination_patterns(self):
         '''generate coordination patterns set from all Str
         
@@ -268,102 +585,25 @@ class AllStr(list,Str):
             struc: Str
             allstr_coordination_pattern.update(struc.coordination_pattern())
         return allstr_coordination_pattern
-                    
-
-    def class_ele(self,ele):
-        '''not use?'''
-        i = 0
-        allCtype,allbond = [],[]
-        self.numstr = len(self)
-        for i in range(self.numstr):
-            k = 0
-            self[i].cdnt2fcnt()
-            for atom in self[i].atom:
-                if atom.ele_num == ele:
-                    self[i].determinespecies(k,[1,6,8])
-                    #self[i].simpleclass(k)
-                    allsymbol = []
-
-                    allbond.append(self[i].atom[k].bondtype)
-                    for item in self[i].atom[k].bondtype:
-                        if item == 1:
-                            symbol = 'H'
-                        elif item == 11:
-                            symbol = 'C'
-                        elif item == 12:
-                            symbol = '=C'
-                        elif item == 13:
-                            symbol = '#C'
-                        elif item == 101:
-                            symbol = 'O'
-                        elif item == 102:
-                            symbol = '=O'
-                        elif item == 103:
-                            symbol = '#O'
-                        else :
-                            symbol = 'unkown'
-                        allsymbol.append(symbol)
-
-                    allCtype.append(tuple(allsymbol))
-                k = k+1
-        allCtype_unique =[[x,allCtype.count(x)] for x in set(allCtype)]
-        allCtype_unique.sort(key = lambda x : x[1], reverse= True)
-        num= len(allCtype_unique)
-
-        bond = bondall.bondpredict([13,12,102,11,101,1])
-        allbondcombine = bond.bondcombine(4)
-
-        print(len(allbondcombine))
-        combinenonexist = []
-        octet = []
-        for combine in allbondcombine:
-            combine.sort(reverse= True)
-            if combine not in allbond:
-                combinenonexist.append(combine)
-            else :
-                octet.append([combine,allbond.count(combine)])
-        octet.sort(key = lambda x : x[1], reverse= True)
 
 
-        return allCtype_unique,num,combinenonexist,octet
+    def get_all_element(self):
+        '''get all element in all_str'''
+        elements = set()
+        for struc in self:
+            elements.update(tuple(struc.sp.keys()))
+        return elements
 
 
-    def cal_all_bond_matrix (self,numproc=24):
-        pool = Pool(processes=numproc)
-        result = pool.map_async(wrapCalBondMatrix, self)
-        pool.close(); pool.join()
-
-        for str,bmx in zip(self,result.get()):
-            str.bmx2D = np.array(bmx).reshape(str.natom, str.natom)
-            str.bmx1D = bmx
-
-#        for str in self :
-#            bmx= str.Bondmatrix()
-#            str.bmx2D = np.array(bmx).reshape(str.natom, str.natom)
-#            str.bmx1D = bmx
+    def shuffle(self, shuffletime):
+        """ shuffle structures"""
+        for i in range(shuffletime): random.shuffle(self)
 
 
-    def cal_all_fake_bond_maxtrix (self,numproc=24):
-        pool = Pool(processes=numproc)
-        result = pool.map_async(wrapCalFakebmx, self)
-        pool.close(); pool.join()
+    def screen_upper(self):
+        for str in self:
+            str.screenuppersurf()
 
-
-        for str,r in zip(self,result.get()):
-            #print r
-            str.bmx2D = np.array(r[1]).reshape(str.natom, str.natom)
-            str.bmx1D = r[1]
-            str.bondneed = r[2]
-            str.Lminstr = r[0]
-            str.surfaceatom = r[3]
-
-    def cal_all_seg_molecular (self, numproc = 24):
-        #self.calAllBondMatrix(numproc=numproc)
-        pool = Pool(processes=numproc)
-        result = pool.map_async(wrapSegmolecular, self)
-        pool.close(); pool.join()
-
-        for str,group in zip(self, result.get()): str.group = group
 
     def single_split(self):
         '''split allstr to each input dir and run SSW-NN'''
@@ -372,7 +612,7 @@ class AllStr(list,Str):
             workdir='para%d'%(i)
             workdirs.append(workdir)
             os.mkdir(workdir)
-            self.print_list([i],'%s/input.arc'%(workdir))
+            self.print_str([i],'%s/input.arc'%(workdir))
             os.system('cp ./input %s'%(workdir))
             os.system('ln -s %s/*.pot %s'%(os.getcwd(),workdir))
         return workdirs
@@ -400,167 +640,6 @@ class AllStr(list,Str):
 
         f.close()
 
-#"""
-#============== the following part is copyed from zpliu XYZCoord.py =============
-#must excute TransferToXYZcoordStr before calling the following function
-#"""
-
-    def build_coord_set(self, onestr=[0, 0], filename='allstr.arc'):
-        '''bulid coordination set from allstr.arc file
-        
-        noted by JamesBourbon in 20220401
-        
-        '''
-        print('Build_Coord_Set')
-        ind = -1
-        index = -1
-        for item in open(filename):
-            line = item.split()[:]
-            if ('Energy' in line
-                or 'SSW-fixlat' in line
-                or 'SSW-Crystl' in line
-                or 'Str' in line
-                    or 'React' in line):
-                ind += 1
-                if onestr[1] == 0 or ind in range(onestr[0], onestr[1]):
-                    index += 1
-                    self.append(Str())
-                    if 'from' not in line:
-                        try:
-                            self[index].energy = float(item.split()[-1])
-                            mk = -2
-                            if self[index].energy.is_integer():
-                                self[index].energy = float(item.split()[-2])
-                                mk = -3
-                            try:
-                                self[index].maxF = float(item.split()[mk])
-                            except:
-                                self[index].maxF = 990
-                        except:
-                            try:
-                                self[index].energy = float(item.split()[-2])
-                                self[index].maxF = float(item.split()[-3])
-                            except:
-                                self[index].energy = 1
-                                self[index].maxF = 990
-                    else:
-                        self[index].energy = float(item.split()[-4])
-                    self.strlen = index+1
-                    self[index].Lfor = False
-                    #if index > 0: self[index-1].energy=self[index-1].energy/float(self[index-1].natom)
-                    m = 1
-
-            if 'PBC' in item and 'ON' not in item and (onestr[1] == 0 or ind in range(onestr[0], onestr[1])):
-                try:
-                    self[index].Latt = [float(x) for x in item.split()[1:7]]
-                except:
-                    self[index].Latt = [99, 99, 99, 90, 90, 90]
-                self[index].Cell = self[index].Latt2Cell()  # get POSCAR format
-                # .Cell is lattice_xyz matrix
-                #print self[index].Cell
-                #print self[index].ReciCell()
-
-            if 'CORE' in item and (onestr[1] == 0 or ind in range(onestr[0], onestr[1])):
-                k = self[index].natom
-                #!self[index].Coord.append([float(x) for x in item.split()[1:4]])
-                try:
-                    # self[index].For.append(list(float(x) for x in strfor.split()[:3]))
-                    self[index].Coord.append([float(x)
-                                    for x in item.split()[1:4]])
-                except:
-                    self[index].Coord.append([0, 0, 0])
-#                   self[index].maxF = 99999
-
-                self[index].Ele_Name.append(item.split()[0])
-#               self[index].EleNam[k] = 'Ta'
-                self[index].natom += 1
-                self[index].Ele_Index.append(
-                    PT.Eledict[self[index].Ele_Name[k]])
-                if self[index].Ele_Name[k] not in self[index].Ele_Name[:k]:
-                    self[index].sp[self[index].Ele_Name[k]] = 1
-                    self[index].sporder[self[index].Ele_Name[k]] = m
-                    m += 1
-                else:
-                    # number of atom in same species
-                    self[index].sp[self[index].Ele_Name[k]] += 1
-
-    def build_for_set(self, onestr=[0, 0], filename='allfor.arc'):
-        '''bulid force set from allfor.arc file
-            if allfor.arc not exist, return None
-        
-        noted by JamesBourbon in 20220401'''
-        print('Build_For_Set')
-        index = -1
-        ind = -1
-        try:
-            f = open(filename, 'r')
-        except:
-            print('--No force info--')
-            return None
-        item = f.readline()
-        if item == None:
-            return None
-        while item:
-            line = item.split()[:]
-            if ('For' in line):
-                #print index,self[index+1].energy
-                if onestr[1] == 0 or ind+1 in range(onestr[0], onestr[1]):
-                    if 'from' not in line:
-                        err = float(item.split()[-1]) - self[index+1].energy
-                    else:
-                        err = float(item.split()[-4]) - self[index+1].energy
-                #print float(item.split()[-1]), self[index+1].energy, e
-                    if (err > 1e-6):
-                        print(index+1, float(item.split()
-                            [-1]), self[index+1].energy, err)
-                        #print index+2, float(item.split()[-1]), self[index+2].energy
-                        raise FooError('Error: incompatible Str with For')
-                        # stop
-                    else:
-                        ind += 1
-                        index += 1
-                        self[index].Lfor = True
-                        strstress = f.readline()
-                        if '**' not in strstress:
-                            try:
-                                self[index].stress = list(
-                                    float(x) for x in strstress.split()[:6])
-                            except:
-                                self[index].stress = [999999, 999999,
-                                                    99999, 99999, 99999, 999999]
-                        else:
-                            self[index].stress = [999999, 999999,
-                                                99999, 99999, 99999, 999999]
-                        #print index,e,self[index].stress
-                        self[index].maxF = 0.0
-                        for i in range(self[index].natom):
-                            strfor = f.readline()
-                            if '**' not in strfor:
-                                try:
-                                    self[index].For.append(
-                                        list(float(x) for x in strfor.split()[:3]))
-                                except:
-                                    self[index].For.append(
-                                        [999999, 999999, 99999])
-                            else:
-                                self[index].For.append([999999, 999999, 99999])
-                            self[index].maxF = max(self[index].maxF, max(
-                                map(abs, [x for x in self[index].For[i]])))
-                    #print 'maxF=',index,self[index].maxF
-            item = f.readline()
-
-
-    def arcinit(self,ind=[0,0],strfile='allstr.arc', forfile='allfor.arc', allformat = 1):
-        '''init arcfile" read allstr and allfor(if exist)'''
-        self.build_coord_set(ind,strfile) # build coordination set from allstr.arc
-        self.build_for_set(ind,forfile) # build force set from allfor.arc
-        if allformat:
-            for str in self:
-                try: 
-                    str.TransferToKplstr() # why do this?
-                except:
-                    # print(str.energy)# always turn to this
-                    continue
 
     def para_run(self,f,num=4):
         '''parallel wrapper to run each structure set with f function
@@ -661,23 +740,23 @@ class AllStr(list,Str):
         return AllStr(sorted(self, key=lambda x: x.sp.get(ele_name, 0)))
 
     def filter_byQE(self,Etol,Qtol,L=False):
-       b=range(len(self))
-       for i in range(len(self)):
-           if b[i] < 0 : continue
-           self._filter_byQE(i,b,Etol,Qtol,L)
-       print(b)
-       return AllStr(x for i,x in enumerate(self) if b[i]>-1)
+        b=range(len(self))
+        for i in range(len(self)):
+            if b[i] < 0 : continue
+            self._filter_byQE(i,b,Etol,Qtol,L)
+        print(b)
+        return AllStr(x for i,x in enumerate(self) if b[i]>-1)
 
     def _filter_byQE(self,i,b,Etol,Qtol,L=False):
         for j in range(len(self)):
             if i>=j or b[j]<0: continue
             if (abs(self[i].energy -self[j].energy) < Etol
-             and ( (L and abs(self[i].Q[3]-self[j].Q[3]) < Qtol*self[i].Q[3]
-             and  abs(self[i].Q[4]-self[j].Q[4]) < Qtol*self[i].Q[4]
-             and  abs(self[i].Q[5]-self[j].Q[5]) < Qtol*self[i].Q[5] ) or
-               ( not L and abs(self[i].Q[0]-self[j].Q[0]) < Qtol*self[i].Q[0]
-             and  abs(self[i].Q[1]-self[j].Q[1]) < Qtol*self[i].Q[1]
-             and  abs(self[i].Q[2]-self[j].Q[2]) < Qtol*self[i].Q[2] )) ) : b[j]=-1
+                and ( (L and abs(self[i].Q[3]-self[j].Q[3]) < Qtol*self[i].Q[3]
+                and  abs(self[i].Q[4]-self[j].Q[4]) < Qtol*self[i].Q[4]
+                and  abs(self[i].Q[5]-self[j].Q[5]) < Qtol*self[i].Q[5] ) or
+                ( not L and abs(self[i].Q[0]-self[j].Q[0]) < Qtol*self[i].Q[0]
+                and  abs(self[i].Q[1]-self[j].Q[1]) < Qtol*self[i].Q[1]
+                and  abs(self[i].Q[2]-self[j].Q[2]) < Qtol*self[i].Q[2] )) ) : b[j]=-1
 
     def sort_by_force(self):
         '''sort Strs by force, return new allstr'''
@@ -687,129 +766,8 @@ class AllStr(list,Str):
         """sort structure by natom, return new allstr"""
         return AllStr(sorted(self, key=lambda x: x.natom))
 
-    def gen_arc(self, set, filename='outstr.arc', ordertype=1 ): #,fmode=0, dirname='test', HydraPre=False):
-        """ generate new arc file, set   => list (ot iter) of structure want to output
-                    filename => name of output arc file
-                        fmode => 0 is defaule format, 1 is allstr.arc type
-                            press => default is zero, else will add pressure effect
-                
-            use it for get new_arc_file from allstr
-            
-            noted by JamesBourbon in 20220401
-        """
-        with open(filename, 'w') as fout:
-            fout.write("!BIOSYM archive 2\nPBC=ON\n")
-            for i in set:
-                energy = self[i].energy
-#               if HydraPre:     energy = self[i].energy + self[i].Volume * HydraPre / 160.2176487
-#               else:         energy = self[i].energy
-                #print self[i].Lfor
-                if not self[i].Lfor : fout.write("\t\t\t\tEnergy\t%8d        -0.0000  %17.6f\n"%(i+1,energy))
-                else: fout.write("\t\t\t\tEnergy\t%8d        %10.6f  %17.6f\n"%(i+1,self[i].maxF,energy))
-
-#                if fmode==0 :  fout.write("\t\t\t\tEnergy\t%8d        %10.6f  %17.6f\n"%(i+1,self[i].maxF,energy))
-#                elif fmode==2:
-#                fout.write("\t\t\t\tEnergy\t%8d        %8.4f %17.6f\n"%(i, self[i].q2, energy))
-#                elif fmode==1:
-#                    fout.write("  Str\t%8d  %8d  SSW-fixlat   %12.6f\n"%(self[i].numsym,i,self[i].energy))
-#                elif fmode==8:
-#                    fout.write("  Str\t%8d  %8d  SSW-fixlat   %12.6f   from %s\n"%(self[i].numMinimum,self[i].numStr, self[i].energy, dirname))
-                fout.write("!DATE\n")
-
-#               lat = self[i].Latt[0:6]
-                lat = self[i].Cell2Latt()
-                fout.write("PBC  %12.6f%12.6f%12.6f%12.6f%12.6f%12.6f\n" %(lat[0],lat[1],lat[2],lat[3],lat[4],lat[5]) )
-                if ordertype==1 :
-                    for j in range(self[i].natom):
-                        ele = self[i].Ele_Name[j]
-                        xa =  self[i].Coord[j]
-                        fout.write("%-2s%18.9f%15.9f%15.9f CORE %4d %-2s %-2s   0.0000 %4d\n"%\
-                            (ele,xa[0],xa[1],xa[2],j+1,ele,ele,j+1))
-                else :
-                    cc=0
-                    for ele in sorted(self[i].sp.keys() , key = lambda x: PT.Eledict[x] ):
-                        for j in range(self[i].natom):
-                            if self[i].Ele_Name[j] == ele:
-                                xa =  self[i].Coord[j]
-                                cc +=1
-                                fout.write("%-2s%18.9f%15.9f%15.9f CORE %4d %-2s %-2s   0.0000 %4d\n"%\
-                                    (ele,xa[0],xa[1],xa[2],cc,ele,ele,cc))
-                fout.write("end\nend\n")
-
-    def gen_forarc(self, set, fname='outfor.arc',ordertype=1):
-        """ generate new For arc file, set"""
-        with open(fname, 'w') as fout:
-            for i in set:
-                fout.write("For %4d  %12.6f\n"%(i+1,self[i].energy))
-                stres = self[i].stress[0:6]
-                fout.write("   %15.9f%15.9f%15.9f%15.9f%15.9f%15.9f\n" \
-                    %(stres[0],stres[1],stres[2],stres[3],stres[4],stres[5]) )
-                if ordertype ==1:
-                    for j in range(self[i].natom):
-                        xa = self[i].For[j]
-                        fout.write("   %15.9f%15.9f%15.9f \n"%(xa[0],xa[1],xa[2]) )
-                else:
-#                   for ele in sorted(self[i].sp.keys()):
-                    for ele in sorted(self[i].sp.keys() , key = lambda x: PT.Eledict[x]):
-                        for j in range(self[i].natom):
-                            if self[i].Ele_Name[j] == ele:
-                                xa = self[i].For[j]
-                                fout.write("   %15.9f%15.9f%15.9f \n"%(xa[0],xa[1],xa[2]) )
-
-                fout.write("\n")
-
-    def gen_POSCAR_VASP(self, num):
-        """ generate POSCAR, num is the num-th structure, fname is the name of output POSCAR
-        
-        refine by JamesBourbon by using str.outPOSCAR
-        """
-        fname='POSCAR_'+str(num)
-        #fout = open(fname, 'w')
-        self[num].outPOSCAR(fname)
-
-
-    def gen_INPUT_SIESTA(self, i, dir='./'):
-        """ generate INPUT_DEBUG, i is the i-th structure, dir is the path of INPUT_DEBUG.template"""
-        fname='INPUT_DEBUG_'+str(i)
-        dict = {}
-        dict['NumberOfAtoms']  = str(self[i-1].natom)
-        dict['NumberOfSpecies'] = str(len(self[i-1].sp))
-        dict['cell']  = self[i-1].printCell()
-        dict['coord'] = self[i-1].printCoord()
-        #print dict
-        with open('%s/INPUT_DEBUG.template'%(dir)) as ftemp:
-                _data = string.Template(ftemp.read())
-        with open(fname,'w') as fout:
-                fout.write(_data.safe_substitute(dict))
-        #os.system('cp %s/*psf .'%(dir))
-
-
-    def GenGIN_GULP(self, num):
-        """ generate gin file, num is the num-th structure, fname is the name of output gin file"""
-        fname = 'test.gin_'+str(num)
-        with open(fname, 'w') as fout:
-            fout.write("conp md\n")
-            fout.write("vector\n")
-            for x in self[num-1].Cell:
-                fout.write("   %15.8f  %15.8f  %15.8f\n"%(x[0],x[1],x[2]))
-            fout.write("cart\n")
-
-            for i in range(self[num-1].natom):
-                xa = self[num-1].Coord[i]
-                ele = self[num-1].Ele_Name[i]
-                fout.write("   %2s CORE  %12.6f  %12.6f  %12.6f\n"%(ele,xa[0],xa[1],xa[2]))
-            #fout.write(Tp.gulp_TiO2.safe_substitute())
 
     
-    def read_coord_set_from_POSCAR(self,filename='POSCAR'):
-        '''build coord set from POSCAR by using Str.build_coord_set_from_POSCAR()
-        
-        re-defined by JamesBourbon
-        '''
-        print('Build_Coord_Set_from_POSCAR')
-        read_str = Str()
-        read_str.build_coord_set_from_POSCAR(filename)
-        self.append(read_str)
         
 
     '''
@@ -888,11 +846,11 @@ class AllStr(list,Str):
 if __name__ == '__main__' :
     test= AllStr()
     test.arcinit([0,0],'input.arc')
-    test.print_list([0],'test.arc')
-    #test.readfile('input.arc',allformat = 1)
+    test.print_str([0],'test.arc')
+    #test.read_arc('input.arc',allformat = 1)
     #test.GenGIN_GULP(0)
 #    test= change()
-#    test.readfile('input.arc')
+#    test.read_arc('input.arc')
 #    for str in test:
 #        for iatom in range(str.natom):
 #            if str.atom[iatom].ele_num == 6:

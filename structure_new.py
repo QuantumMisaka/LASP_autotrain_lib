@@ -31,8 +31,8 @@ class Str(object):
     def __init__(self):
         self.atom = [] # S_atom list for all atom in Str
         self.energy = 0 # Energy of a Str
-        self.abc= [] # lattice parameter
         self.Latt = [] # lattice parameter
+        self.abc = self.Latt # same pointer?
         self.Cell = [] # abc-in-xyz, POSCAR-abc, transfer-matrix
         self.natom = 0 # number of atoms in Str
         self.Ele_Name =[] # element name list for all atom in str
@@ -55,12 +55,13 @@ class Str(object):
         self.maxF = 0
         self.max_stress = 0
         self.frac = []
+        self.strlen = 0
         self.centerf = {}
         self._cycle=[]
         self.cart = []
         self.Q= []
 
-    def addatom(self, line, flag = 1 ):
+    def addatom(self, line: str, flag = 1 ):
         '''add one atom from structure format file line
         
         Args:
@@ -78,7 +79,7 @@ class Str(object):
             #for arc and ms
             coord = [float(x) for x in line.split()[1:4]]
             ele_symbol = line.split()[0] # get element symbol
-            ele_number = PT.Eledict[ele_symbol] # get element number using symbol
+            ele_number = PT.Eledict.get(ele_symbol,0) # get element number using symbol
             single_atom = S_atom(coord,ele_number) # 
             # get charge
             try:
@@ -97,42 +98,57 @@ class Str(object):
         elif flag == 3:# for cat file
             coord = [float(x) for x in line.split()[1:4]]
             ele_symbol = str(line.split()[0])[0]
-            ele_number = PT.Eledict[ele_symbol] 
+            ele_number = PT.Eledict.get(ele_symbol,0)
             self.atom.append(S_atom(coord,ele_number))
         elif flag == 4:#for mol file
             coord = [float(x) for x in line.split()[0:3]]
             ele_symbol = line.split()[3]
-            ele_number = PT.Eledict[ele_symbol]
+            ele_number = PT.Eledict(ele_symbol,0)
             self.atom.append(S_atom(coord,ele_number))
         elif flag == 5: #for QM9
             coord = [float(x) for x in line.split()[1:4]]
             ele_symbol = line.split()[0]
-            ele_number = PT.Eledict[ele_symbol]
+            ele_number = PT.Eledict(ele_symbol,0)
             self.atom.append(S_atom(coord,ele_number))
         elif flag == 6:
             coord = [float(x) for x in line.split()[1:4]]
             ele_symbol = line.split()[-2]
-            ele_number = PT.Eledict[ele_symbol]
+            ele_number = PT.Eledict(ele_symbol,0)
             single_atom= S_atom(coord,ele_number)
             single_atom.charge =float(line.split()[-1])
             self.atom.append(single_atom)
 
 
-
-    def add_force(self, line, serial_num, flag=1):
+    def add_force(self, line :str, serial_num, flag=1):
+        '''flag 1 for arc-for file 2 for trainfor-file'''
         if flag == 1:
-            # for arc
             self.atom[serial_num].force = [float(x) for x in line.split()]
         elif flag == 2:
             self.atom[serial_num].force= [float(x) for x in line.split()[2:5]]
 
-    def add_stress(self, line, flag=1): # type 1 => for arc file; 2 => Data file
+    def add_stress(self, line: str, flag=1): 
+        '''flag 1 for arc-file 2 for traindata-file'''
         if   flag == 1: self.stress = [float(x) for x in line.split()]
         elif flag == 2: self.stress = [float(x) for x in line.split()[1:7]]
 
     def add_charge(self, base):
         for atom in self.atom:
             atom.charge = base[atom.ele_symbol]
+
+    def set_coord(self):
+        '''set self.Coord from self.atom, do before sort_by_ele'''
+        self.Coord = []
+        for atom in self.atom:
+            # atom: S_atom
+            self.Coord.append(atom.xyz)
+        self.Coord = np.array(self.Coord)
+        
+    def set_for_list(self):
+        '''set self.For from self.atom, do before sort_by_ele'''
+        self.For = []
+        for atom in self.atom:
+            self.For.append(atom.force)
+        self.For = np.array(self.For)
 
     def element_to_list(self, element_count: dict):
         '''transfer element_count dict (Str.sp) to all_element list'''
@@ -199,12 +215,13 @@ class Str(object):
                         cart_coord = np.dot([np.float64(x) for x in L_list[0:3]], self.Cell)
                         self.frac.append(frac_coord)
                         self.Coord.append(cart_coord)
-                    self.atom.append(S_atom)
-                    self.atom[atom_id].xyz = cart_coord
-                    self.atom[atom_id].ele_num = self.Ele_Index[atom_id]
-                    self.atom[atom_id].ele_symbol = self.Ele_Name[atom_id]
+                    atom_obj = S_atom(cart_coord, self.Ele_Index[atom_id])
+                    self.atom.append(atom_obj)
                     atom_id += 1    
-            self.natom = atom_id    
+            # self.sort_atom_by_element # not need
+            # self.natom = atom_id
+            self.Latt = self.Cell2Latt()
+            self.get_atom_num()
             f.close()
         return  
 
@@ -216,21 +233,18 @@ class Str(object):
             if maxf < _tmpf:
                 maxf = _tmpf
         self.maxF = maxf
-        self.maxF = maxf
         
     def get_max_stress(self):
         self.max_stress = max(self.stress)
-        
-
-
-
+    
     def get_atom_num(self, ):
         '''used in VASP.run and train_str_init
+        
+        need Str.atom
         
         for get: natom, eleList, natompe, nele, ele_nameList
         '''
         self.natom = len(self.atom)
-        self.natom = self.natom
         self.eleList,self.natompe = list(np.unique([atom.ele_num for atom in self.atom],return_counts=True))
         self.ele_nameList = [PT.Eletable[ele_num-1] for ele_num in self.eleList]
         self.sp = {}
@@ -247,7 +261,7 @@ class Str(object):
     def screen_upper_surf(self,):
         self.upper =0
         for atom in self.atom:
-            if atom.xyz[2] > 0.9*self.abc[2]:
+            if atom.xyz[2] > 0.9*self.Latt[2]:
                 self.upper =1
                 break
 
@@ -276,14 +290,6 @@ class Str(object):
         latinv    = np.linalg.inv(self.Cell)
         self.fdnt = [list(x) for x in np.matmul(self.xa, latinv)]
         # self.fdnt 
-
-    def set_coord(self):
-        '''set self.Coord from self.atom'''
-        self.Coord = []
-        for atom in self.atom:
-            # atom: S_atom
-            self.Coord.append(atom.xyz)
-        self.Coord = np.array(self.Coord)
             
 
     def calc_centroid(self):
@@ -297,7 +303,7 @@ class Str(object):
     def mv_str_to_boxcenter(self):
         #for Ortholat
         self.calc_centroid()
-        center =np.array([self.abc[0]/2,self.abc[1]/2,self.abc[2]/2])
+        center =np.array([self.Latt[0]/2,self.Latt[1]/2,self.Latt[2]/2])
         mv = center - self.centroid
         for i,atom in enumerate(self.atom):
             atom.xyz = list(self.xa[i]+mv)
@@ -312,43 +318,8 @@ class Str(object):
             a = 10
             while ((a-delta) < 4):
                 a=a+5
-            self.abc =[a,a,a,90,90,90]
+            self.Latt =[a,a,a,90,90,90]
             
-
-    def abc2lat(self):
-        a, b, c  = self.abc[0:3]
-        alpha, beta, gamma = [x*np.pi/180.0 for x in self.abc[3:]]
-
-        bc2 = b**2 + c**2 - 2*b*c*np.cos(alpha)
-        h1 = a
-        #h1= checkzero(h1)
-        h2 = b * np.cos(gamma)
-        # h2 = checkzero(h2)
-        h3 = b * np.sin(gamma)
-        #  h3 = checkzero(h3)
-        h4 = c * np.cos(beta)
-        # h4 = checkzero(h4)
-        h5 = ((h2 - h4)**2 + h3**2 + c**2 - h4**2 - bc2)/(2 * h3)
-        # h5 = checkzero(h5)
-        h6 = np.sqrt(c**2 - h4**2 - h5**2)
-        # h6 = checkzero(h6)
-        
-        self.Cell = [[h1, 0., 0.], [h2, h3, 0.], [h4, h5, h6]]
-
-    def lat2abc (self, flag=False, inlat=False):
-        if not flag: lat = self.Cell
-        else:        lat = inlat
-
-        self.nlat = np.array(self.Cell)
-        a = np.linalg.norm(lat[0])
-        b = np.linalg.norm(lat[1])
-        c = np.linalg.norm(lat[2])
-        alpha = m.acos(np.dot(lat[1],lat[2]) / (b*c))*180.0/np.pi
-        beta  = m.acos(np.dot(lat[0],lat[2]) / (a*c))*180.0/np.pi
-        gamma = m.acos(np.dot(lat[0],lat[1]) / (a*b))*180.0/np.pi
-        if not flag: self.abc = [a,b,c,alpha, beta, gamma]
-        else:        return [a,b,c,alpha, beta, gamma]
-
 
     def outPOSCAR(self,outfile="POSCAR"):
         '''print structure to POSCAR file'''
@@ -376,9 +347,9 @@ class Str(object):
         
         writed by JamesBourbon
         '''
-        ka = int(m.ceil(criteria / float(self.abc[0])))
-        kb = int(m.ceil(criteria / float(self.abc[1])))
-        kc = int(m.ceil(criteria / float(self.abc[2])))
+        ka = int(m.ceil(criteria / float(self.Latt[0])))
+        kb = int(m.ceil(criteria / float(self.Latt[1])))
+        kc = int(m.ceil(criteria / float(self.Latt[2])))
         
         with open(outfile, 'w') as fout:
             fout.write('mesh auto\n')
@@ -668,7 +639,7 @@ class Str(object):
         #self.atom[iatom].species = i + 1
         self.atom[iatom].bondall = bond_all
         return
-
+    '''
     def calc_Ctypes(self, ):
         self.calc_one_dim_coord()
         cell = reduce(lambda a,b: a+b, self.Cell)
@@ -678,10 +649,8 @@ class Str(object):
         self.c_rv   = pointer((ctypes.c_double*len(cell))(*cell))
         iza = [atom.ele_num for atom in self.atom]
         self.c_iza  = pointer((ctypes.c_int*self.natom)(*iza))
-    
+    '''
 
-    def JudgeBond(self):
-        return
 
     def calc_frag_charge(self):
         "charge here is fakecharge, actually group id"
@@ -889,10 +858,11 @@ class Str(object):
 #"must excute transfer before calling the different part function"
 #
     def transfer_toP_XYZ_coordStr(self):
-        self.natom = self.natom
-        self.Latt = self.abc
+        '''Get Str: Ele_Name, Ele_Index, Coord, sp, sporder, For, maxF from atom list
+        
+        Require Latt, natompe, and ele_nameList
+        '''
         self.Cell = self.Latt2Cell()
-        self.energy = self.energy
         self.Ele_Name =[]
         self.Ele_Index  = []
         self.Coord = []
@@ -900,33 +870,31 @@ class Str(object):
             self.Ele_Name.append(atom.ele_symbol)
             self.Ele_Index.append(atom.ele_num)
             self.Coord.append(atom.xyz)
-    
         for iele,elesymbol in enumerate(self.ele_nameList):
             self.sp[elesymbol] = self.natompe[iele]
             self.sporder[elesymbol] = iele+1
-    
-    
         if self.Lfor :
             self.For= []
             for atom in self.atom:
                 self.For.append(atom.force)
             self.get_max_force()
-            self.maxF = self.maxF
-            self.maxF = self.maxF
     
     
     def TransferToKplstr(self):
-        # many many questions about why should do this function
-        self.atom =[] # why define it again?
+        '''Get Str.atom from  items
+            
+        Require Latt, For, Coord, Ele_Index
+        
+        '''
+        self.atom =[] 
         for i in range(self.natom):
             self.atom.append(S_atom(self.Coord[i],self.Ele_Index[i]))
             if self.Lfor:
                 self.atom[i].force= self.For[i]
-        self.abc= self.Latt
-        # self.energy= self.energy
         self.sort_atom_by_element()
         self.get_atom_num()
-        self.abc2lat()
+        if not self.Cell:
+            self.Latt2Cell()
 
 #
 #"=============== the following part is copyed from zpliu XYZCoord.py ============="
@@ -948,27 +916,27 @@ class Str(object):
 
     def myfilter(self,BadStrP):
         if( \
-           self.energy > BadStrP.HighE*float(self.natom) or \
-           self.energy < BadStrP.LowE*float(self.natom) or \
-           min(self.Latt[:3]) < BadStrP.MinLat or \
-           max(self.Latt[:3]) > BadStrP.MaxLat or \
-           max(self.Latt[3:7]) > BadStrP.MaxAngle or \
-           min(self.Latt[3:7]) < BadStrP.MinAngle or \
+            self.energy > BadStrP.HighE*float(self.natom) or \
+            self.energy < BadStrP.LowE*float(self.natom) or \
+            min(self.Latt[:3]) < BadStrP.MinLat or \
+            max(self.Latt[:3]) > BadStrP.MaxLat or \
+            max(self.Latt[3:7]) > BadStrP.MaxAngle or \
+            min(self.Latt[3:7]) < BadStrP.MinAngle or \
 ##          max(self.Latt[:3]) > 5.0*min(self.Latt[:3]) or \
-           self.maxF > BadStrP.MaxFor):
-           #print '111',self.maxF,BadStrP.MaxFor
-           return False
+            self.maxF > BadStrP.MaxFor):
+            #print '111',self.maxF,BadStrP.MaxFor
+            return False
         else:
-          #print self.energy,True
-         # return True
-           if len(self.For) :
-         #    #print self.maxF,BadStrP.MaxFor
-              if self.maxF > BadStrP.MaxFor : 
-                  print(self.maxF, BadStrP.MaxFor)
-                  return False
-              else: return True
-           else:
-              return True
+            #print self.energy,True
+            # return True
+            if len(self.For):
+            #    #print self.maxF,BadStrP.MaxFor
+                if self.maxF > BadStrP.MaxFor : 
+                    print(self.maxF, BadStrP.MaxFor)
+                    return False
+                else: return True
+            else:
+                return True
 
     def myfilter_byd(self,Badd1,Badd2,type):
 
@@ -1007,7 +975,7 @@ class Str(object):
         a,b,c,alpha,beta,gamma = self.Latt[:6]
         pi = 3.14159265358937932384626
         alpha,beta,gamma = alpha*pi/180.0,beta*pi/180.0,gamma*pi/180.0
-        bc2 = b**2 + c**2 - 2*b*c*np.cos(alpha)
+        # bc2 = b**2 + c**2 - 2*b*c*np.cos(alpha)
         h1 = a
         h2 = b * np.cos(gamma)
         h3 = b * np.sin(gamma)
@@ -1116,9 +1084,9 @@ class Str(object):
         
         Returns: bulk, layer, cluster
         '''
-        if (self.abc[0] == self.abc[1] == self.abc[2]
-            ) and (self.abc[3] == self.abc[4] == self.abc[5]
-            ) and self.abc[0] >= 10:
+        if (self.Latt[0] == self.Latt[1] == self.Latt[2]
+            ) and (self.Latt[3] == self.Latt[4] == self.Latt[5]
+            ) and self.Latt[0] >= 10:
             return "cluster"
         else:
             # not enough, need to place the cell in center
@@ -1126,7 +1094,7 @@ class Str(object):
             max_coord = np.max(self.Coord, axis=0)
             min_coord = np.min(self.Coord, axis=0)
             coord_space = max_coord - min_coord
-            is_vacc = (coord_space - vac - self.abc[:3]) >= 0
+            is_vacc = (coord_space - vac - self.Latt[:3]) >= 0
             sum_vac_dim = np.sum(is_vacc)
             if sum_vac_dim >= 3:
                 return "cluster"
