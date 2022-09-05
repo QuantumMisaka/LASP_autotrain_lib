@@ -47,7 +47,7 @@ class Str(object):
         self.ele_nameList = [] # specific element in Str
         
         # relevant to force
-        self.Lfor = True # have allfor.arc to read or not
+        self.Lfor = False # have allfor.arc to read or not
         self.For= [] # list contains force of Str in each-atom-3D
         self.stress = [] # stress list ?
 
@@ -79,8 +79,16 @@ class Str(object):
             #for arc and ms
             coord = [float(x) for x in line.split()[1:4]]
             ele_symbol = line.split()[0] # get element symbol
+            if ele_symbol not in PT.Eletable:
+                # for ms.car file
+                for element in PT.Eletable:
+                    if element in ele_symbol:
+                        ele_symbol = element
+                        break
+                else:
+                    raise FooError("element in arc-structure not found!")
             ele_number = PT.Eledict.get(ele_symbol,0) # get element number using symbol
-            single_atom = S_atom(coord,ele_number) # 
+            single_atom = S_atom(coord, ele_number) # 
             # get charge
             try:
                 single_atom.charge = float(line.split()[-2])
@@ -221,7 +229,7 @@ class Str(object):
             # self.sort_atom_by_element # not need
             # self.natom = atom_id
             self.Latt = self.Cell2Latt()
-            self.get_atom_num()
+            self.set_strinfo_from_atom()
             f.close()
         return  
 
@@ -237,12 +245,9 @@ class Str(object):
     def get_max_stress(self):
         self.max_stress = max(self.stress)
     
-    def get_atom_num(self, ):
-        '''used in VASP.run and train_str_init
+    def set_strinfo_from_atom(self, ):
+        '''set eleList, natompe, ele_nameList, Ele_Index, Ele_Name from Str.atom
         
-        need Str.atom
-        
-        for get: natom, eleList, natompe, nele, ele_nameList
         '''
         self.natom = len(self.atom)
         self.eleList,self.natompe = list(np.unique([atom.ele_num for atom in self.atom],return_counts=True))
@@ -258,6 +263,7 @@ class Str(object):
         self.Ele_Index = [atom.ele_num for atom in self.atom]
         self.Ele_Name  = [atom.ele_symbol for atom in self.atom]
 
+
     def screen_upper_surf(self,):
         self.upper =0
         for atom in self.atom:
@@ -266,7 +272,7 @@ class Str(object):
                 break
 
     def sort_atom_by_element(self,):
-        '''used in VASP.run'''
+        '''sort atom in stucture by atom.ele_num, for normalize sturcture'''
         self.atom.sort(key =lambda X: X.ele_num)
 
     def sort_atom_by_z(self,):
@@ -294,7 +300,7 @@ class Str(object):
 
     def calc_centroid(self):
         # centroid = mass center
-        self.get_atom_num()
+        self.set_strinfo_from_atom()
         xyzall =np.array([0,0,0])
         for atom in self.atom:
             xyzall= xyzall+np.array(atom.xyz)
@@ -541,8 +547,6 @@ class Str(object):
         short = min(minlist)
         return short
     
-    
-
         
 
     def simple_class(self,iatom):
@@ -639,6 +643,7 @@ class Str(object):
         #self.atom[iatom].species = i + 1
         self.atom[iatom].bondall = bond_all
         return
+
     '''
     def calc_Ctypes(self, ):
         self.calc_one_dim_coord()
@@ -663,7 +668,8 @@ class Str(object):
                 groupdict[atom.charge] =[]
                 groupdict[atom.charge].append(atom)
         self.frag= groupdict
-       
+
+
     def cal_group_frag(self):
         groupdict ={}
         for i,atom in enumerate(self.atom):
@@ -675,7 +681,7 @@ class Str(object):
                 groupdict[self.group[i]].append(atom)
         self.frag= groupdict
 
- 
+
     def determine_charge(self):
         self.cal_group_frag()
         for item in self.frag.values():
@@ -781,12 +787,13 @@ class Str(object):
     def get_all_bond(self):
         self.allbond=[]
         for i in range(self.natom):
-            for j in xrange(i+1,self.natom):
+            for j in range(i+1,self.natom):
                 if self.bmx2D[i][j] > 0:
                     self.allbond.append([i,j,self.bmx2D[i][j]])
 
         self.nbond = len(self.allbond)
 
+    '''
     def get_atom_info(self):
         for i in range(self.natom):
             self.atom[i].expbond= 0
@@ -803,7 +810,7 @@ class Str(object):
                         self.atom[j].expbond = self.atom[j].expbond +1
                     else:
                         self.atom[j].imph = self.atom[j].imph +1
-
+    '''
 
     def calc_unsaturated_number(self):
         nH =0
@@ -892,7 +899,7 @@ class Str(object):
             if self.Lfor:
                 self.atom[i].force= self.For[i]
         self.sort_atom_by_element()
-        self.get_atom_num()
+        self.set_strinfo_from_atom()
         if not self.Cell:
             self.Latt2Cell()
 

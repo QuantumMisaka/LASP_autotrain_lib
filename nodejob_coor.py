@@ -1,7 +1,6 @@
 # for parallelly running collect allstr in auto.py
 # can directly used to choose traindata_update structure
-# last change by JamesBourbon in 20220720 add checkpoints
-# SSW_choose_mode = 1 in auto.py, test passed
+# last change by JamesBourbon in 20220903 due to gen_arc update
 
 from allstr_new import AllStr as AllStr_new
 # from structure_new import Str
@@ -10,10 +9,11 @@ import sys
 import os
 
 # init setting
-new_pattern_limit = 2
-patterns_db = "traindata_patterns.json" # in SSW workdir
+new_pattern_limit = 10
+patterns_db = "../traindata_patterns.json" # db in workdir, run in SSWdir
 chosen_patterns = CoordinationPatterns(name="train_data", limit=new_pattern_limit)
 if os.path.exists(patterns_db):
+    print("---- Read Exist Coor-Patterns Database ----")
     chosen_patterns.read_coordination_json(patterns_db)
 
 def collect_allstr(workdir,nbadneed):
@@ -29,9 +29,10 @@ def collect_allstr(workdir,nbadneed):
         return
     elif str_count <= choosing_volume:
         print('counting nbad: not enough')
-        AllStr.gen_arc(list(range(str_count)), out_file,2)
+        # AllStr.gen_arc(list(range(str_count)), out_file)
     else:
         # use coor_pattern method to collect structure
+        print('collect Enough nbad, print outstr.arc add to VASP_DFT')
         AllStr.random_arange(10)
         count = 0
         for struc in AllStr:
@@ -45,9 +46,8 @@ def collect_allstr(workdir,nbadneed):
                 if len(AllStrGot) >= nbadneed:
                     print(f"---- effictive/total = {nbadneed}/{count} ----")
                     break
-        print('collect Enough nbad, print outstr.arc add to VASP_DFT')
         chosen_patterns.print_operation_log() # print coor patterns log
-        AllStrGot.gen_arc(list(range(nbadneed)), out_file,2)
+        AllStrGot.gen_arc(list(range(nbadneed)), out_file)
         #  DO NOT update json coor-pattern database now: screen_data is needed backward
         # json_string = chosen_patterns.print_all_coordinations_full()
         # with open(patterns_db, 'w') as fo:

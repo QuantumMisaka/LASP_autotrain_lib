@@ -26,13 +26,13 @@ class AllStr(list):
     #     self.strlen = 0
     
     # arcfile read 1st
-    def read_arc(self,inputfile, forcefile=False, allformat = 0):
+    def read_arc(self,strfile, forfile=False, allformat = 0):
         '''read allstr.arc (and allfor.arc) file
             used in VASP.run()
             
         noted by JamesBourbon in 20220402    
         '''
-        f= open(inputfile,'r')
+        f= open(strfile,'r')
         currentStr = -1
         for line in f:
             if ('Energy' in line\
@@ -65,13 +65,13 @@ class AllStr(list):
                 self[currentStr].Lfor = False
                 self[currentStr].energy = 0
                 self.maxF = 0
-            elif 'CORE' in line:
+            elif ('CORE' in line) or ('XXXX' in line):
                 self[currentStr].addatom(line, 1 )
             elif ('PBC' in line ) and ('ON' not in line):
                 self[currentStr].Latt= [float(x) for x in line.split()[1:]]
         f.close()
-        if forcefile:
-            f = open(forcefile,'r')
+        if forfile:
+            f = open(forfile,'r')
             currentStr= -1
             for line in f:
                 if "For" in line:
@@ -90,7 +90,7 @@ class AllStr(list):
         for str in self:
             str: Str
             str.sort_atom_by_element()
-            str.get_atom_num()
+            str.set_strinfo_from_atom()
             str.set_coord()
             str.Cell = str.Latt2Cell()
             if str.Lfor:
@@ -168,25 +168,13 @@ class AllStr(list):
                 except:
                     self[index_str].Latt = [99, 99, 99, 90, 90, 90]
             # atom line: add coord to atom, not to self.Coord
-            if 'CORE' in line and (onestr[1] == 0 or ind_getstr in range(onestr[0], onestr[1])):
+            if  (('CORE' in line) or ('XXXX' in line)) \
+                and (onestr[1] == 0 or ind_getstr in range(onestr[0], onestr[1])):
                 atom_ind = self[index_str].natom
                 try:
                     self[index_str].addatom(line)  # add info to atoms
                 except:
                     self[index_str].addatom('NaN 0 0 0')
-                self[index_str].Ele_Name.append(item[0])
-                self[index_str].Ele_Index.append(
-                    PT.Eledict[self[index_str].Ele_Name[atom_ind]])
-                # self[index_str].eleList, self[index_str].natompe = list(np.unique([atom.ele_num for atom in self[index_str].atom], return_counts=True))
-                # self[index_str].ele_nameList = [PT.Eletable[ele_num-1] for ele_num in self[index_str].eleList]
-                if self[index_str].Ele_Name[atom_ind] not in self[index_str].Ele_Name[:atom_ind]:
-                    # find new element species
-                    self[index_str].sp[self[index_str].Ele_Name[atom_ind]] = 1
-                    self[index_str].sporder[self[index_str].Ele_Name[atom_ind]] = ele_order
-                    ele_order += 1
-                else:
-                    # add number of atom in same element species
-                    self[index_str].sp[self[index_str].Ele_Name[atom_ind]] += 1
                 self[index_str].natom += 1  # update natom and atom_ind
 
         
@@ -249,7 +237,6 @@ class AllStr(list):
                                     self[index_str].add_force(
                                         "999999 999999 999999", i)
                                     # self[index_str].For.append([999999, 999999, 99999])
-
                             else:
                                 self[index_str].add_force(
                                     "999999 999999 999999", i)
@@ -258,15 +245,15 @@ class AllStr(list):
                                 map(abs, [x for x in self[index_str].atom[i].force])))
             line = f.readline()
 
+
     def arcinit(self, ind=[0, 0], strfile='allstr.arc', forfile='allfor.arc', allformat=0):
         '''init arcfile" read allstr and allfor(if exist)'''
-        self.build_coord_set(
-            ind, strfile)  # build coordinate set from allstr.arc
+        self.build_coord_set(ind, strfile)  # build coordinate set from allstr.arc
         self.build_for_set(ind, forfile)  # build force set from allfor.arc
         for str in self:
             str: Str
             str.sort_atom_by_element()  # need to sort-arange
-            str.get_atom_num()
+            str.set_strinfo_from_atom()
             str.set_coord()
             str.Cell = str.Latt2Cell()
             if str.Lfor:
@@ -291,42 +278,44 @@ class AllStr(list):
     def read_str(self, strfile, forcefile = False):
         '''read TrainStr.txt and TrainFor.txt'''
         currentStr = -1
-        for item in open(strfile):
-            if 'Start' in item:
+        for line in open(strfile):
+            if 'Start' in line:
                 currentStr = currentStr+1
                 self.append(Str())
                 #self[currentStr].serial_num = currentStr
-            elif 'Energy' in item:
-                self[currentStr].energy= float(item.split()[2])
-            elif 'lat' in item:
+            elif 'Energy' in line:
+                self[currentStr].energy= float(line.split()[2])
+            elif 'lat' in line:
                 self[currentStr].Cell.append([
-                        float(x) for x in item.split()[1:4]])
-            elif 'ele' in item and 'element' not in item:
-                self[currentStr].addatom(item, 2 )
+                        float(x) for x in line.split()[1:4]])
+            elif 'ele' in line and 'element' not in line:
+                self[currentStr].addatom(line, 2 )
 
         self.numstr = currentStr + 1
         for i in range(self.numstr):
             # self[i].sort_atom_by_element() # need to read force before
-            self[i].get_atom_num()
+            self[i].set_strinfo_from_atom()
             self[i].Cell2Latt()
             self[i].set_coord()
+            self[i].Lfor = False
         # print(self[i].natom)
         print("TrainStr has read!")        
         
         if forcefile:
             f = open(forcefile,'r')
             currentStr = -1
-            for item in f:
-                if 'Start' in item:
+            for line in f:
+                if 'Start' in line:
                     currentStr = currentStr+1
-                elif 'stress' in item:
-                    self[currentStr].stress= [float(x) for x in item.split()[1:]]
+                elif 'stress' in line:
+                    self[currentStr].stress= [float(x) for x in line.split()[1:]]
                     iatom = 0
-                elif 'force' in item:
-                    self[currentStr].add_force(item, iatom ,2)
+                elif 'force' in line:
+                    self[currentStr].add_force(line, iatom ,2)
                     iatom = iatom +1
             for i in range(self.numstr):
                 self[i].get_max_force()
+                self[i].Lfor = True
             print("TrainFor has read!")
             
         for i in range(self.numstr):
@@ -485,12 +474,14 @@ class AllStr(list):
                         (lat[0], lat[1], lat[2], lat[3], lat[4], lat[5]))
                 try:
                     # default: read from Str.atom
-                    for i,atom in enumerate(str.atom):
+                    for i,atom in enumerate(self[i].atom):
                         fout.write('%-3s %15.9f %15.9f %15.9f CORE %4d %2s %2s %8.4f %4d\n' %
                         (atom.ele_symbol, atom.xyz[0], atom.xyz[1], atom.xyz[2],
                             i+1, atom.ele_symbol, atom.ele_symbol, atom.charge, i+1))
+                    # print("gen_arc from Str.atom")
                 except:
                     # if order-ed by Str.sort_by_ele
+                    print("Wronging: gen_arc from Coord but not Str.atom")
                     for j in range(self[i].natom):
                         ele_name = self[i].Ele_Name[j]
                         coord = self[i].Coord[j]
