@@ -24,9 +24,8 @@ def shrink_soft(init_str: Str, ratio_range=RATIO_RANGE):
         # output_str.set_coord()
         frac = output_str.FracCoord()
         ratio = rd.uniform(ratio_range[0], ratio_range[1])
-        output_str.abc[index] = vector * ratio
-        output_str.Latt = output_str.abc 
-        # abc and Latt problem should find a time to sort out -- tips
+        output_str.Latt[index] = vector * ratio
+        # abc and Latt problem fixed
         output_str.Cell = output_str.Latt2Cell()
         # get all shrinked cart coordinate
         for i,atom in enumerate(output_str.atom):
@@ -40,9 +39,8 @@ def shrink_hard(init_str: Str, ratio_range=RATIO_RANGE):
     for index, vector in enumerate(output_str.abc[:3]):
         # output_str.set_coord()
         ratio = rd.uniform(ratio_range[0], ratio_range[1])
-        output_str.abc[index] = vector * ratio
-        output_str.Latt = output_str.abc
-        # abc and Latt problem should find a time to sort out -- tips
+        output_str.Latt[index] = vector * ratio
+        # abc and Latt problem fixed
         output_str.Cell = output_str.Latt2Cell()
     return output_str
         
