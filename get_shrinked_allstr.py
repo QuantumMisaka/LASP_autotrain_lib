@@ -20,7 +20,7 @@ def shrink_soft(init_str: Str, ratio_range=RATIO_RANGE):
     '''shrink init-structure by fractional coordination'''
     output_str = copy.deepcopy(init_str)
     # you can figure out why use deep-copy
-    for index, vector in enumerate(output_str.abc[:3]):
+    for index, vector in enumerate(output_str.Latt[:3]):
         # output_str.set_coord()
         frac = output_str.FracCoord()
         ratio = rd.uniform(ratio_range[0], ratio_range[1])
@@ -36,14 +36,14 @@ def shrink_soft(init_str: Str, ratio_range=RATIO_RANGE):
 def shrink_hard(init_str: Str, ratio_range=RATIO_RANGE):
     '''shrink init-structure by Cartesian coordination'''
     output_str = copy.deepcopy(init_str)
-    for index, vector in enumerate(output_str.abc[:3]):
+    for index, vector in enumerate(output_str.Latt[:3]):
         # output_str.set_coord()
         ratio = rd.uniform(ratio_range[0], ratio_range[1])
         output_str.Latt[index] = vector * ratio
-        # abc and Latt problem fixed
+        output_str.Latt = output_str.Latt
+        # abc and Latt problem should fixed
         output_str.Cell = output_str.Latt2Cell()
     return output_str
-        
         
     
 def main(strfile, soft_num = SOFT_NUM, hard_num = HARD_NUM ,file_type = FILETYPE):
