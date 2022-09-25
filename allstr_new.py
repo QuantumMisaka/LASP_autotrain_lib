@@ -295,7 +295,7 @@ class AllStr(list):
         for i in range(self.numstr):
             # self[i].sort_atom_by_element() # need to read force before
             self[i].set_strinfo_from_atom()
-            self[i].Cell2Latt()
+            self[i].Latt = self[i].Cell2Latt()
             self[i].set_coord()
             self[i].Lfor = False
         # print(self[i].natom)

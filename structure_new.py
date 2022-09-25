@@ -996,7 +996,9 @@ class Str(object):
         return cell
 
     def Cell2Latt(self):
-        """ transform of lattice vector to (a,b,c,alpha,beta,gamma)"""
+        """ transform of lattice vector to (a,b,c,alpha,beta,gamma)
+        
+        return Latt array"""
         lat= self.Cell[0:3]
         a = np.linalg.norm(lat[0])
         b = np.linalg.norm(lat[1])
