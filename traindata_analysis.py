@@ -1,10 +1,10 @@
 # analysis traindata
 # JamesBourbon update in 20220725
 # update function for analysis elements conbination of all struc
-from allstr_new import AllStr
-from structure_new import Str
 import numpy as np
 import sys
+from allstr_new import AllStr
+# from structure_new import Str
 
 
 # setting

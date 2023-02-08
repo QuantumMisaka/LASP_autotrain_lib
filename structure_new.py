@@ -279,6 +279,7 @@ class Str(object):
         self.atom.sort(key= lambda X: X.xyz[2])
 
     def calc_two_dim_coord(self, ):
+        '''get self.xa as for self.Coord()'''
         self.xa = np.array([atom.xyz for atom in self.atom])
 
     def calc_one_dim_coord(self, ):
@@ -299,7 +300,7 @@ class Str(object):
             
 
     def calc_centroid(self):
-        # centroid = mass center
+        # centroid = mass center, but here is only the center of all atom
         self.set_strinfo_from_atom()
         xyzall =np.array([0,0,0])
         for atom in self.atom:
@@ -396,16 +397,35 @@ class Str(object):
         return radius_dict
         
     
+    def center_struc_byone(self, iatom=0):
+        '''centerize structure by one atom, used for layer_pattern capture
+
+        :param: iatom [default 0]
+        :returns: atoms coord, iatom_frac = array([0.5,0.5,0.5])
+        :not recommend to use self.Coord = [this function],
+        :JamesMisaka in 20230208
+        '''
+        if self.frac == []:
+            self.frac = self.FracCoord() # get fractional coord
+        center = np.array([0.5, 0.5, 0.5])
+        mv_vec = center - self.frac[iatom] # moving vector
+        # a fine method for peridically moving atoms
+        frac_moved = self.frac + mv_vec
+        frac_moved_final = frac_moved - np.floor(frac_moved)
+        cart_moved = np.matmul(frac_moved_final, self.Cell)
+        return cart_moved
+
     
     def calc_dis(self, iatom1, iatom2):
         '''calc periodic atom distance, considered periodic in x-np.round(x)
         
-        just consider one cell'''
-        self.cdnt2fcnt() # get fractional coord
-        vbond =np.array(self.fdnt[iatom1])- np.array(self.fdnt[iatom2])
+        just consider one cell, modified by JamesMisaka in 20230208'''
+        self.frac = self.FracCoord()
+        vbond =np.array(self.frac[iatom1])- np.array(self.frac[iatom2])
         dis = np.linalg.norm(np.matmul( np.array([x-np.round(x) for x in vbond]), self.Cell))
         return dis
     
+
     def calc_neighbour(self,iatom):
         '''calc distance of one atom to all other atom
         
@@ -1021,17 +1041,19 @@ class Str(object):
         return np.transpose(np.linalg.inv(self.Cell))
 
     def FracCoord(self):
-        """ get fractional coordinate """
+        """ get fractional coordinate from self.Cell matrix and self.Coord """
         cellr = np.linalg.inv(self.Cell)
         return np.dot(self.Coord,cellr)
 
     def frac_module(self):
+        '''why this?'''
         frac = self.FracCoord()
         for i,x in enumerate(frac):
             frac[i]=map(lambda y:(y+1000.0) % 1.0,frac[i])
         return frac
 
     def centralize(self,n=1):
+        '''problem in frac_module'''
         if n==1 : frac = self.frac_module()
         else:
 #           key= self.centerf.keys() ; key.sort()       #  sort by keys in dict
@@ -1086,36 +1108,104 @@ class Str(object):
                         self.centralize(0)
                         for j in range(self.natom) : self.Coord[j][0:3]= self.cart[j][0:3]
                         return fragment, self.Coord, self.Cell
-                    
-    # update 0814, need refinement
-    def get_basic_shape(self, vac=5):
-        '''find the basic cell shape
-        
-        Returns: bulk, layer, cluster
-        '''
-        if (self.Latt[0] == self.Latt[1] == self.Latt[2]
-            ) and (self.Latt[3] == self.Latt[4] == self.Latt[5]
-            ) and self.Latt[0] >= 10:
-            return "cluster"
+    
+
+    def gen_cell_along(self, direc=0):
+        '''get cell by moving cell along direction x:0, y:1, z:2'''
+        cell_coord = []
+        if direc==0 or direc=='x':
+            cell_coord = self.Coord + self.Cell[0]
+        elif direc==1 or direc =='y':
+            cell_coord = self.Coord + self.Cell[1]
+        elif direc==2 or direc == 'z':
+            cell_coord = self.Coord + self.Cell[2]
         else:
-            # not enough, need to place the cell in center
+            print("not a valid moving direction")
+        return cell_coord
+
+
+    def judge_bonding_between_cells(self, coords_1, coords_2, tol=1.6):
+        '''calc bonding between cells, 
+        methods like calc coordination patterns, using radius dataset'
+
+        :tips: index of coords_1 and coords_2 should be the same as self.Coord
+        
+        :param coord1: coords for cell 1
+        :param coord2: coords for cell 2
+        :param tol: tolerance for judging bonding by radius dataset
+        :returns: True if have bonding between cells
+
+        JamesMisaka in 20230208
+        '''
+        radius_dict = self.set_element_radius()
+        min_dist = 99
+        atoms_between_min_dist = [1,1] # only for default
+        for i,coord_1 in enumerate(coords_1):
+            ele_index_1 = int(self.Ele_Index[i]) # get elements
+            for j,coord_2 in enumerate(coords_2):
+                cart_dist = np.linalg.norm(coord_1 - coord_2)
+                ele_index_2 = int(self.Ele_Index[j])
+                if cart_dist < min_dist: 
+                    min_dist = cart_dist
+                    atoms_between_min_dist = [ele_index_1, ele_index_2]
+        radius = np.array([radius_dict.get(x,6) for x in atoms_between_min_dist])
+        cutoff_foruse = np.sum(radius) * tol
+        # judge bonding or not
+        if min_dist < cutoff_foruse:
+            return True
+        else:
+            return False
+
+
+    def judge_vaccum(self, cell_coord, tol=0):
+        '''judge vaccum exist or not in 3 dim
+
+        :params: cell coordinates
+        :params tol/cutoff for control bonding judgement
+        :returns: [bool,bool,bool] along x,y,z for have vaccum or not
+        '''
+        vaccum_status = []
+        for i in range(3):
+            coords_1 = cell_coord
+            coords_2 = self.gen_cell_along(i)
+            connection_status = self.judge_bonding_between_cells(
+                coords_1, coords_2, )
+            if tol>=1:
+                connection_status = self.judge_bonding_between_cells(
+                    coords_1, coords_2, tol=tol
+                )
+            vaccum = not connection_status
+            vaccum_status.append(vaccum)
+        return vaccum_status
+
+
+    # update 230208, basic version for use, need refinement
+    def get_basic_shape(self, tol=0):
+        '''find the basic cell shape, version 1.1, judge cellshape by cell-bonding
+        
+        :params: tol/cutoff for judge_vaccum method
+        :Returns: bulk, layer, cluster
+        '''
+        if self.Coord == []:
             self.set_coord()
-            max_coord = np.max(self.Coord, axis=0)
-            min_coord = np.min(self.Coord, axis=0)
-            coord_space = max_coord - min_coord
-            is_vacc = (coord_space - vac - self.Latt[:3]) >= 0
-            sum_vac_dim = np.sum(is_vacc)
-            if sum_vac_dim >= 3:
-                return "cluster"
-            elif sum_vac_dim >=1:
-                return "layer"
-            else:
-                return "bulk"
+        centered_coord = self.center_struc_byone()
+        # for capture layer where atom in cell_edge
+        # still have excetion for multi-layer
+        vaccum_status = self.judge_vaccum(centered_coord, tol, )
+        sum_vac_dim = np.sum(vaccum_status)
+        if sum_vac_dim >= 3:
+            return "cluster"
+        elif sum_vac_dim >=1:
+            return "layer"
+        else:
+            return "bulk"
             
 
 
     def judge_shape(self,cut=2.6):
-        """ find the shortest bond between neighboring cell to judge solid shape"""
+        """ find the shortest bond between neighboring cell to judge solid shape
+        
+        zpliu raw version, cannot use"""
         if len(self.centerf)==0: L = self.frac_center({0:self.FracCoord()[0]})
         if not L: return {"fragments":-1}
 
@@ -1202,35 +1292,35 @@ class Str(object):
         return angle
 
     def cell_bondconnect(self,cut,cell1,cell0=[0,0,0]):
+        '''judge bonding between cells, zpliu version, cannot use '''
+        frac1=[]; VectorA = []; N=self.natom
+        for i in range(N): frac1.append(np.add(self.frac[i],cell1))
+        cart1=np.dot(frac1,self.Cell)
 
-       frac1=[];VectorA = []; N=self.natom
-       for i in range(N): frac1.append(np.add(self.frac[i],cell1))
-       cart1=np.dot(frac1,self.Cell)
+        if cell0[0]!=0 or cell0[1]!=0 or cell0[2]!=0 :
+            frac0=[]
+            for i in range(N): frac0.append(np.add(self.frac[i],cell0))
+            cart0=np.dot(frac0,self.Cell)
+            pos=[]
+            pos.append(sum([y[0] for y in cart0])/float(self.natom))
+            pos.append(sum([y[1] for y in cart0])/float(self.natom))
+            pos.append(sum([y[2] for y in cart0])/float(self.natom))
+        else:
+            frac0 = self.frac
+            cart0  = self.cart
+            pos    = self.central_pos
 
-       if cell0[0]!=0 or cell0[1]!=0 or cell0[2]!=0 :
-           frac0=[]
-           for i in range(N): frac0.append(np.add(self.frac[i],cell0))
-           cart0=np.dot(frac0,self.Cell)
-           pos=[]
-           pos.append(sum([y[0] for y in cart0])/float(self.natom))
-           pos.append(sum([y[1] for y in cart0])/float(self.natom))
-           pos.append(sum([y[2] for y in cart0])/float(self.natom))
-       else:
-           fract0 = self.frac
-           cart0  = self.cart
-           pos    = self.central_pos
-
-       d0=999
-       for i in range(N):
-           for j in range(N):
-               b = np.subtract(cart1[i],cart0[j])
-               d = m.sqrt(np.dot(b,b))
-               if d< d0: d0= d
-       return  d0 < cut
+        d0=999
+        for i in range(N):
+            for j in range(N):
+                b = np.subtract(cart1[i],cart0[j])
+                d = m.sqrt(np.dot(b,b))
+                if d< d0: d0= d
+        return  d0 < cut
 
 
     def neighbor(self,at,cut=2.6):
-        """ find the shortest bond neighbors of atom  """
+        """ find the shortest bond neighbors of atom, zpliu raw version  """
         frac = self.frac_module()
         cart = np.dot(frac,self.Cell)
         cart0= np.dot(at.values()[0],self.Cell)
@@ -1269,7 +1359,7 @@ class Str(object):
 
 
     def Shortestbond(self):
-        """ find the shortest bond """
+        """ find the shortest bond, zpliu raw version """
         frac = self.frac_module()
         cart = np.dot(frac,self.Cell)
         N=self.natom   #len(cart)

@@ -1,7 +1,7 @@
 # for trainstr trainsfer to arc str file
 # JamesBourbon in 20220726
 
-import sys  
+import sys
 from allstr_new import AllStr
 
 str_file = "TrainStr.txt"

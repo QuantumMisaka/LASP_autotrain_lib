@@ -1,8 +1,8 @@
 # get coodination patterns from allstr.arc or TrainStr.txt
 # can parallelly read exist pattern_db and update
 # JamesBourbon in 20220807
-# give the same result to single version
-# new question: inconsisitent with update based on db
+# give the same result to single version, well used.
+# simple parallel computation can be coding by multiprocessing package.
 
 from multiprocessing.pool import MapResult
 # from multiprocessing import Pool
