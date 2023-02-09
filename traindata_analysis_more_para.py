@@ -1,14 +1,33 @@
 # analysis traindata
 # JamesMisaka update in 20230208
 # more infomation get from train-data
-# refined and well used
+# parallel version
 
-from allstr_new import AllStr
-from structure_new import Str
 import numpy as np
 import pandas as pd
 import sys
+from multiprocessing import Pool
+from allstr_new import AllStr
+from structure_new import Str
 
+def get_info_from_struc(stru: Str) -> dict:
+    '''get infomation from struc in train-data, unit for parallel comp
+    
+    :param stru: instance of Str class
+    :returns: dict for all we need
+    '''
+    ele_conb = tuple(stru.sp.keys())
+    atom_conb = ""
+    natom = 0
+    for atom, num in stru.sp.items():
+        atom_conb += atom
+        atom_conb += str(num)
+        natom += num
+    cell_and_atom = (atom_conb, cell_type)
+    return {
+        "ele_conb":ele_conb,
+        ""
+    }
 
 
 # setting
@@ -55,16 +74,18 @@ cell_and_atom_type_dict = {}
 for stru in allstr_raw:
     stru : Str
     ele_conb = tuple(stru.sp.keys())
-    elements_conb_dict[ele_conb] = elements_conb_dict.get(ele_conb, 0) + 1
+    
     atom_conb = ""
     natom = 0
     for atom, num in stru.sp.items():
         atom_conb += atom
         atom_conb += str(num)
-        natom += num
-    natom_dict[atom_conb] = natom_dict.get(atom_conb, 0) + 1
-    cell_type = stru.get_basic_shape() # key time comsuming step
+    natom = stru.natom
     cell_and_atom = (atom_conb, cell_type)
+    cell_type = stru.get_basic_shape() # key time comsuming step
+    # can be independent manage
+    natom_dict[atom_conb] = natom_dict.get(atom_conb, 0) + 1
+    elements_conb_dict[ele_conb] = elements_conb_dict.get(ele_conb, 0) + 1
     atom_conb_dict[atom_conb] = atom_conb_dict.get(atom_conb, 0) + 1
     cell_type_dict[cell_type] = cell_type_dict.get(cell_type, 0) + 1
     cell_and_atom_type_dict[cell_and_atom] = cell_and_atom_type_dict.get(cell_and_atom, 0) + 1
