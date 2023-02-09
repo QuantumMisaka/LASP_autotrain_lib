@@ -1,33 +1,31 @@
 # analysis traindata
 # JamesMisaka update in 20230208
 # more infomation get from train-data
-# parallel version
+# parallel version, well used, same result as single version
 
 import numpy as np
 import pandas as pd
 import sys
+import os
 from multiprocessing import Pool
 from allstr_new import AllStr
 from structure_new import Str
+import time
 
 def get_info_from_struc(stru: Str) -> dict:
     '''get infomation from struc in train-data, unit for parallel comp
-    
+
     :param stru: instance of Str class
     :returns: dict for all we need
     '''
     ele_conb = tuple(stru.sp.keys())
     atom_conb = ""
-    natom = 0
     for atom, num in stru.sp.items():
         atom_conb += atom
         atom_conb += str(num)
-        natom += num
+    cell_type = stru.get_basic_shape() # key time comsuming step
     cell_and_atom = (atom_conb, cell_type)
-    return {
-        "ele_conb":ele_conb,
-        ""
-    }
+    return ele_conb, atom_conb ,stru.natom, cell_type, cell_and_atom
 
 
 # setting
@@ -58,7 +56,6 @@ allstr_sort_by_stress = allstr_raw.sort_by_stress()
 max_stress = max(allstr_sort_by_stress[size-1].stress)
 
 
-
 # forset all-in-one
 # Specific infomation about Traindata element conbination and cell type
 atom_conb_dict = {}
@@ -71,28 +68,25 @@ cell_and_atom_type_dict = {}
 
 
 # can be parallel computation
-for stru in allstr_raw:
-    stru : Str
-    ele_conb = tuple(stru.sp.keys())
-    
-    atom_conb = ""
-    natom = 0
-    for atom, num in stru.sp.items():
-        atom_conb += atom
-        atom_conb += str(num)
-    natom = stru.natom
-    cell_and_atom = (atom_conb, cell_type)
-    cell_type = stru.get_basic_shape() # key time comsuming step
-    # can be independent manage
-    natom_dict[atom_conb] = natom_dict.get(atom_conb, 0) + 1
-    elements_conb_dict[ele_conb] = elements_conb_dict.get(ele_conb, 0) + 1
-    atom_conb_dict[atom_conb] = atom_conb_dict.get(atom_conb, 0) + 1
-    cell_type_dict[cell_type] = cell_type_dict.get(cell_type, 0) + 1
-    cell_and_atom_type_dict[cell_and_atom] = cell_and_atom_type_dict.get(cell_and_atom, 0) + 1
+start_time = time.perf_counter()
+# method from chbpku 
+with Pool(processes=None) as p:
+    for info_list in p.imap(get_info_from_struc,
+            allstr_raw, os.cpu_count()):
+        # can be independent manage
+        ele_conb, atom_conb , natom, cell_type, cell_and_atom = info_list
+        natom_dict[atom_conb] = natom
+        elements_conb_dict[ele_conb] = elements_conb_dict.get(ele_conb, 0) + 1
+        atom_conb_dict[atom_conb] = atom_conb_dict.get(atom_conb, 0) + 1
+        cell_type_dict[cell_type] = cell_type_dict.get(cell_type, 0) + 1
+        cell_and_atom_type_dict[cell_and_atom] = cell_and_atom_type_dict.get(cell_and_atom, 0) + 1
+end_time = time.perf_counter()
+time_consumed = end_time - start_time
 
 
 # print Traindata info
-print("Getting Traindata infomation ...")
+print(f" ---- Processing Done in {time_consumed} s")
+print(" ---- Getting Traindata infomation ...")
 info_string = "---- Traindata Analysis Result ----\n"
 info_string += f" Data Size: {size} (structures)\n"
 info_string += f" Max Force: {max_for} (eV/Ang)\n"
@@ -114,7 +108,7 @@ for cell_and_atoms, count in cell_and_atom_type_dict.items():
 
 info_string += "---- DONE! ----"
 
-print("Printing Traindata infomation table ...")
+print(" ---- Printing Traindata infomation table ...")
 # give a csv file for Traindata
 atoms_and_type_info = {}
 for atom_conb, count in atom_conb_dict.items():
@@ -133,6 +127,7 @@ atoms_and_type_info["Total"] = {
     "sum":size
 }
 atoms_df = pd.DataFrame(atoms_and_type_info).T # need transpose
+atoms_df.sort_index()
 atoms_df.to_csv("Traindata_analysis_table.csv")
 
 print(info_string)
