@@ -1,0 +1,51 @@
+#!/bin/bash 
+#PBS -N dft-i
+#PBS -r n 
+#PBS -j oe 
+#PBS -l walltime=96:00:00
+#PBS -l nodes=1:ppn=24
+#PBS -q xmcao
+
+source /data/intel-env/intel18.sh
+# go to work dir
+cd $PBS_O_WORKDIR
+# The program we want to execute (modify to suit your setup)
+EXEC=/data/apps/vasp/5.4.4/AllInOne/vasp_std
+
+# setup mpd env (Of course use some other secret word than "dfadfs")
+if [ ! -f ~/.mpd.conf ]; then
+/bin/echo "secretword=dfadfs" >> ~/.mpd.conf
+/bin/chmod 600 ~/.mpd.conf
+fi
+
+##########################################################
+# The following should be no need to
+#       change any of these settings for normal use.
+##########################################################
+
+# setup Nums of Processor
+NP=`cat $PBS_NODEFILE|wc -l`
+echo "Numbers of Processors:  $NP"
+echo "---------------------------"
+echo `date`
+cat $PBS_NODEFILE | uniq
+
+# setup mpi env (em64t)
+export OMP_NUM_THREADS=1
+#export P4_GLOBMEMSIZE=1073741824
+export I_MPI_PIN_DOMAIN=auto
+export MPD_CON_EXT=$PBS_JOBID
+
+rm JobFinished.state
+echo "Job start at `date`" > JobRunning.state
+
+if [[ $PBS_NUM_NODES -eq 1 ]];then
+        mpirun -r ssh -n $NP $EXEC 2>&1 > print-out
+else
+        mpirun -r ssh -genv I_MPI_FABRICS shm:dapl -n $NP $EXEC 2>&1 > print-out
+fi
+
+mv JobRunning.state JobFinished.state
+echo "Job Finished at `date`" >> JobFinished.state
+echo `date` >> $HOME/finish
+echo `pwd` >>  $HOME/finish
