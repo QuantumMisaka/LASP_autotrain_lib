@@ -5,9 +5,16 @@ Modified: James.Misaka.Bourbon.Liu
 
 Original: ZPLiu's Group (SDHuang, SCMa, ZPLiu et. al.)
 
-Last Update: 2022-09-05
+Last Update: 2023-02-11
 
-Version: V1.2.5
+Version: V1.2.6
+
+## Update log
+
+V1.2.6: 
+1. Script Traindata_analysis_more.py for give the full infomation of TrainStr.txt and TrainFor.txt
+2. Script Traindata_analysis_more_para.py for parallel doing infomation subtraction
+3. bug fixed of allstr_new.py and sturcture_new.py
 
 ## Program Structure
 
@@ -40,8 +47,26 @@ Original LASP_PythonLib use Python-2.7, which is TOTALLY OUT-Of-DATE
    6. shellscript in little_script dir.
    7. computeQ.py for calculate dafa for PlotQE usage.
 
+## Scripts related to files manipulation of LASP jobs
 
-## How to run SSW-NN-autotrain and auto.py
+1. related to traindata
+   1. shiftformat.py: arc2train or train2arc usage (independent)
+   2. vasp2lasptrain.py: vasp-dft result directly to TrainStr.txt and TrainFor.txt (independent)
+   3. cut_traindata.py: cut TrainStr/TrainFor by
+   4. traindata_analysis.py: print-out basic statistic infomation of TrainStr/TrainFor, which can have overview.
+   5. traindata_analysis_more(_para).py: print-out full infomation of TrainStr/TrainFor, which can be used for SI.
+2. related to arc_data
+   1. findGM.py: find top100 (can be set) global minimum structure from SSW result
+   2. splitarc_auto.py: split all-str arc file to one-str arc file (or dft-project dir), for doing LASP or VASP
+   3. nodejob.py and nodejob_coor.py: collect all-str from SSW to VASP-DFT
+   4. collect_vasp_label.py: collect and screen all-str from SSW to VASP-DFT (not test)
+   5. screen_data.py: from auto.py, used to screen all-str from SSW result (not test)
+3. related to coordination patterns
+   1. dft_setting dir: used for coor_verlet_sample.py
+   2. coor_verlet_sample.py: two-steps dynamic verlet sampling based on stucture similarity described by coordination patterns
+   3. update_patterns(_parallel).py: generate coordination patterns of all-str (and add to exist database)
+
+## Main Function of Scripts: Run SSW-NN-autotrain and auto.py
 
 ### 1. modify console file
 
@@ -118,24 +143,6 @@ export PYTHONPATH=/data/apps/intel/intelpython3/bin:$PYTHONPATH
 
 ### 6. qsub jobs.sh (or sbatch jobs_local.slurm)
 
-## Other scripts
-
-1. related to traindata
-   1. shiftformat.py: arc2train or train2arc usage
-   2. vasp2lasptrain.py: vasp-dft result directly to TrainStr.txt and TrainFor.txt
-   3. cut_traindata.py: cut TrainStr/TrainFor by 
-   4. traindata_analysis.py: print-out statistic infomation of TrainStr/TrainFor
-2. related to arc_data
-   1. findGM.py: find top100(can be set) global minimum structure from SSW result
-   2. splitarc_auto.py: split all-str arc file to one-str arc file (or dft-project dir)
-   3. nodejob.py and nodejob_coor.py: collect all-str from SSW to VASP-DFT
-   4. collect_vasp_label.py: collect and screen all-str from SSW to VASP-DFT (not test)
-   5. screen_data.py: from auto.py, used to screen all-str from SSW result (not test)
-3. related to coordination patterns
-   1. dft_setting dir: used for coor_verlet_sample.py
-   2. coor_verlet_sample.py: two-steps dynamic verlet sampling based on stucture similarity described by coordination patterns
-   3. update_patterns.py: generate coordination patterns of all-str (and add to exist database)
-      1. parallel version is still coding/refining, this version have lower speed
 
 ## some tips
 
