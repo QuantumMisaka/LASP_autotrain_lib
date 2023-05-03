@@ -1,7 +1,6 @@
 # noting by JamesBourbon
 # last change in 20220730
 # from atom_k import S_atom
-from operator import index
 from structure_new import Str
 from structure_new import wrapCalBondMatrix, wrapSegmolecular,wrapCalFakebmx, BadStr, FooError, ParaWrap_JudgeShape, ParaWrap_Shortestbond
 from structure_new import ParaWrap_ChemicalFormula
@@ -489,7 +488,7 @@ class AllStr(list):
                                 (ele_name, coord[0], coord[1], coord[2], j+1, ele_name, ele_name, j+1))
                 fout.write("end\nend\n")
 
-    def gen_forarc(self, set, fname='outfor.arc'):
+    def gen_forarc(self, iter, fname='outfor.arc'):
         """ generate new For arc file
         
         use it for get new_arc_file from AllStr(Str) (not from Str.atom)
@@ -497,7 +496,7 @@ class AllStr(list):
         noted by JamesBourbon in 20220902    
         """
         with open(fname, 'w') as fout:
-            for i in set:
+            for i in iter:
                 fout.write("For %4d  %12.6f\n" % (i+1, self[i].energy))
                 stres = self[i].stress[0:6]
                 fout.write("   %15.9f %15.9f %15.9f %15.9f %15.9f %15.9f\n"
@@ -520,6 +519,31 @@ class AllStr(list):
         fname = 'POSCAR_'+str(num)
         #fout = open(fname, 'w')
         self[num].outPOSCAR(fname)
+
+
+    def gen_REANN_configuration(self, iter, fname="configuration"):
+        """ generate configuration file for REANN
+
+        Inputs:
+            iter: iterable to indicate range which print
+            fname: output filename, default "configuration"
+        """
+        print("== Generating Congifuration file for REANN ==")
+        point = 0
+        with open(fname, 'w') as fout:
+            for i in iter:
+                point += 1
+                str = self[i]
+                str: Str
+                fout.write(f"point={point:>4}\n")
+                for lat in str.Cell:
+                    fout.write("%12.8f  %12.8f  %12.8f\n"%(lat[0], lat[1], lat[2]))
+                fout.write("pbc 1  1  1\n") # for pbc in reann
+                for atom in str.atom:
+                    fout.write(f"{atom.ele_symbol:4s} {atom.mess:6.3f} {atom.xyz[0]:12.8f} {atom.xyz[1]:12.8f} {atom.xyz[2]:12.8f} {atom.force[0]:10.6f} {atom.force[1]:10.6f} {atom.force[2]:10.6f} \n")
+                fout.write(f"abprop: {str.energy}\n")
+        print(f"== Done with configuration file containing {point} structures ! ==")
+
 
 
     def gen_INPUT_SIESTA(self, i, dir='./'):
