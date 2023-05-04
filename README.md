@@ -5,11 +5,16 @@ Modified: James.Misaka.Bourbon.Liu
 
 Original: ZPLiu's Group (SDHuang, SCMa, ZPLiu et. al.)
 
-Last Update: 2023-02-11
+Last Update: 2023-05-04
 
 Version: V1.2.6
 
 ## Update log
+
+V1.2.6.1: 
+Update lasp2reann.py and related compoents to 
+transform lasp allstr/for.arc or TrainStr/For.arc
+to REANN configuratuon formula.
 
 V1.2.6: 
 1. Script Traindata_analysis_more.py for give the full infomation of TrainStr.txt and TrainFor.txt
