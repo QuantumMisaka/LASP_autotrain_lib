@@ -544,6 +544,43 @@ class AllStr(list):
                 fout.write(f"abprop: {str.energy}\n")
         print(f"== Done with configuration file containing {point} structures ! ==")
 
+    def gen_extxyz(self, iter, fname="traindata.xyz"):
+        """ generate ASE extended xyz format for NequIP, also easily for ASE and Ovito to read
+        
+        Inputs:
+            iter: iterable to indicate range which print
+            fname: output filename, default "traindata.xyz"
+        
+        """
+        print("== Generating extxyz format file ==")
+        frame = 0
+        with open(fname, 'w') as fout:
+            for i in iter:
+                frame += 1
+                struc = self[i]
+                struc: Str
+                fout.write(f'{struc.natom}\n') # xyz head
+                cell_info = " ".join(f"{i:12.8f}" for i in np.array(struc.Cell).flatten())
+                # for stress/virial
+                # KB_to_eVA3 = np.float64(1602.1766208)
+                Vxx, Vxy, Vxz, Vyy, Vyz, Vzz = struc.stress
+                stress_tensor = np.array([
+                    [Vxx, 0, 0,],
+                    [Vxy, Vyy, 0],
+                    [Vxz, Vyz, Vzz]
+                    ], dtype=np.float64
+                )
+                stress_info = " ".join(f"{i:12.8f}" for i in stress_tensor.flatten()) # eV/A3
+                info_line = f'Lattice="{cell_info}" stress="{stress_info}" '
+                info_line += f'energy={struc.energy} ' # eV
+                info_line += f'Properties=species:S:1:pos:R:3:forces:R:3 ' # eV/A
+                info_line += 'pbc="T T T" \n'
+                fout.write(info_line)
+                for atom in struc.atom:
+                    fout.write(f"{atom.ele_symbol:4s} {atom.xyz[0]:12.8f} {atom.xyz[1]:12.8f} {atom.xyz[2]:12.8f} {atom.force[0]:12.8f} {atom.force[1]:12.8f} {atom.force[2]:12.8f} \n")
+        print(f"== Done with extxyz file containing {frame} structures ! ==")
+
+
 
 
     def gen_INPUT_SIESTA(self, i, dir='./'):

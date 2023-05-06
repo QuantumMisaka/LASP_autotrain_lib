@@ -49,7 +49,7 @@ class Str(object):
         # relevant to force
         self.Lfor = False # have allfor.arc to read or not
         self.For= [] # list contains force of Str in each-atom-3D
-        self.stress = [] # stress list ?
+        self.stress = [] # stress list , ordered by 
 
         # self.serial_num = 0
         self.maxF = 0
