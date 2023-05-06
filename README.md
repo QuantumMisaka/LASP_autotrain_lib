@@ -13,7 +13,7 @@ Version: V1.2.7
 
 V1.2.7: 
 1. Update lasp2reann.py and related compoents to transform lasp allstr/for.arc or TrainStr/For.arc to REANN configuratuon formula.
-2. Update lasp2extxyz.py and related compoents to transform lasp allstr/for.arc or TrainStr/For.arc to extxyz formula for ASE, Ovito and NequIP
+2. Update lasp2extxyz.py and related compoents to transform lasp allstr/for.arc or TrainStr/For.arc to extxyz formula for ASE, Ovito, VMD and NequIP
 
 V1.2.6: 
 1. Script Traindata_analysis_more.py for give the full infomation of TrainStr.txt and TrainFor.txt
