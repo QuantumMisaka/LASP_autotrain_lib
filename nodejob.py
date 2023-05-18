@@ -7,7 +7,7 @@ import sys
 def collect_allstr(workdirs,nbadneed):
     print("collect allstr from SSW nodejob.py")
     AllStr = AllStr_new() 
-    AllStr.arcinit([0,0],'%s/allstr.arc'%(workdirs), "") 
+    AllStr.read_arc('%s/allstr.arc'%(workdirs), "") 
     str_count = len(AllStr)
     out_file = '%s/outstr.arc'%workdirs
     if (str_count == 0): 

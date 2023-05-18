@@ -33,7 +33,7 @@ if __name__ == "__main__":
         allstr_read.print_str_all('outstr.arc')
     if sys.argv[1] == "arc2pos":
 #  arc to POSCAR: can be multiple
-        allstr_read.arcinit([0,0],ARC_INPUT)  
+        allstr_read.read_arc(ARC_INPUT)  
         for i in range(len(allstr_read)): 
             allstr_read.gen_POSCAR_VASP(i)
 

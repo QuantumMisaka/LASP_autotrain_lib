@@ -18,7 +18,7 @@ if __name__ == "__main__":
         strfile, limit, outputfile = sys.argv[1:]
         
     all_str = AllStr()
-    all_str.arcinit([0,0], strfile, forfile="")
+    all_str.read_arc( strfile, forfile="")
     all_str_sorted = all_str.sort_by_energy()
     all_str_sorted.gen_arc(range(limit), outputfile,)
     

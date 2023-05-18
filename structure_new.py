@@ -10,6 +10,7 @@ import ctypes
 import re
 from functools import reduce # in py3
 import pandas as pd
+from ctypes import pointer
 # from coordination_pattern import CoordinationPatterns
 
 
@@ -31,8 +32,7 @@ class Str(object):
     def __init__(self):
         self.atom = [] # S_atom list for all atom in Str
         self.energy = 0 # Energy of a Str
-        self.Latt = [] # lattice parameter
-        self.abc = self.Latt # same pointer?
+        self.Latt = [] # lattice parameter of Str
         self.Cell = [] # abc-in-xyz, POSCAR-abc, transfer-matrix
         self.natom = 0 # number of atoms in Str
         self.Ele_Name =[] # element name list for all atom in str
@@ -756,7 +756,7 @@ class Str(object):
         onedim_fa = reduce(lambda a,b: a+b, self.fdnt)
         self.c_fxa = pointer((ctypes.c_double*len(onedim_fa))(*onedim_fa))
 
-        bmatrix = pointer((ctypes.c_int*sqnatm)(*[0 for i in range(sqnatm)]))
+        bmatrix = ctypes.pointer((ctypes.c_int*sqnatm)(*[0 for i in range(sqnatm)]))
         bcal = ctypes.cdll.LoadLibrary(program)
         bcal.hbondmatrix_ (self.c_natm, self.c_fxa, self.c_iza, self.c_rv, bmatrix)
         return list(bmatrix.contents)

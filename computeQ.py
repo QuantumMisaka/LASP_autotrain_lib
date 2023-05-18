@@ -20,7 +20,7 @@ from allstr_new import AllStr as allstr_new
 
 if __name__ == "__main__":
     allstr = allstr_new()
-    allstr.arcinit([0,0],'all.arc')    # structure file name of all.arc
+    allstr.read_arc('all.arc')    # structure file name of all.arc
     print('All Str:',len(allstr))
     Ncore = 56
 

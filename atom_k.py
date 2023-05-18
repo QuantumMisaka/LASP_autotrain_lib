@@ -10,12 +10,12 @@ class S_atom(object):
         self.xyz= coord
         self.ele_num = element_num  
         self.ele_symbol = PT.Eletable[self.ele_num-1]
-        self.mess = PT.Elemass[self.ele_num-1]
+        self.mass = PT.Elemass[self.ele_num-1]
         self.force = []
         self.symf = []
         self.species = 0
         self.bondlist = []
         self.bondtype = []
-        self.Ctye = 'empty'
+        self.Ctype = 'empty'
         self.charge = 0
 

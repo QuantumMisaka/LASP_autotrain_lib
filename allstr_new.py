@@ -32,6 +32,7 @@ class AllStr(list):
         noted by JamesBourbon in 20220402    
         '''
         f= open(strfile,'r')
+        print('--- Read Structure File ---')
         currentStr = -1
         for line in f:
             if ('Energy' in line\
@@ -60,6 +61,7 @@ class AllStr(list):
                     else: 
                         self[currentStr].energy = 990
             elif 'Materials Studio' in line:
+                self.append(Str())
                 currentStr +=  1
                 self[currentStr].Lfor = False
                 self[currentStr].energy = 0
@@ -67,9 +69,11 @@ class AllStr(list):
             elif ('CORE' in line) or ('XXXX' in line):
                 self[currentStr].addatom(line, 1 )
             elif ('PBC' in line ) and ('ON' not in line):
-                self[currentStr].Latt= [float(x) for x in line.split()[1:]]
+                self[currentStr].Latt= [float(x) for x in line.split()[1:7]]
         f.close()
+        print(" --- %d Structures Have Read ---"%(currentStr+1))
         if forfile:
+            print('--- Read Force File ---')
             f = open(forfile,'r')
             currentStr= -1
             for line in f:
@@ -85,18 +89,20 @@ class AllStr(list):
                     else:                  self[currentStr].add_force('0.0 0.0 0.0', iatom)
                     iatom += 1
             f.close()
+        else:
+            print('--- No Force File ---')
         # str normalization
-        for str in self:
-            str: Str
-            str.sort_atom_by_element()
-            str.set_strinfo_from_atom()
-            str.set_coord()
-            str.Cell = str.Latt2Cell()
-            if str.Lfor:
-                str.set_for_list()
+        for struc in self:
+            struc: Str
+            struc.sort_atom_by_element()
+            struc.set_strinfo_from_atom()
+            struc.set_coord()
+            struc.Cell = struc.Latt2Cell()
+            if struc.Lfor:
+                struc.set_for_list()
         if allformat:
-            for str in self:
-                str: Str
+            for struc in self:
+                struc: Str
                 # str.TransferToXYZcoordStr() # not use
 
     # arcfile read 2nd
@@ -897,7 +903,7 @@ class AllStr(list):
 
 if __name__ == '__main__' :
     test= AllStr()
-    test.arcinit([0,0],'input.arc')
+    test.read_arc('input.arc')
     test.print_str([0],'test.arc')
     #test.read_arc('input.arc',allformat = 1)
     #test.GenGIN_GULP(0)

@@ -80,7 +80,8 @@ class RunSSW:
         Natom = [] # atom list for each SSW_rand_list work object
 
         AllStr0 = AllStr_new() # create AllStr object
-        AllStr0.arcinit([0,0],'./sourcedir/allstr-ini.arc')
+        # AllStr0.arcinit([0,0],'./sourcedir/allstr-ini.arc')
+        AllStr0.read_arc('./sourcedir/allstr-ini.arc')
         AllStr0.random_arange(200) # random set allstr-ini.arc for 200 times
         for i in range(28): # 28 is a magical number, equal to ntype
             AllStr0.gen_arc([i],'outstr.arc') # get i_index Str from AllStr
@@ -129,13 +130,13 @@ class RunSSW:
             shutil.copy('./sourcedir/%s.pot'%(jobname),dir)
             Natom.append(int(os.popen('cat ./%s/input.arc | wc -l'%dir).readline().strip())-7)
             # calc number of atoms in input.arc file, append to Natom list
-            if Natom[i]<40: os.system('sed -i "1i\supercell 2 1 1" ./sourcedir/input.%s'%(inputlist[itype]))
+            if Natom[i]<50: os.system('sed -i "1i\supercell 2 1 1" ./sourcedir/input.%s'%(inputlist[itype]))
             # intentially train some large structure, supercell for enlarge cell
 
         return workdir,Natom
 
     
-    def run(self,njob:int ,ncycle:int, nbadneed:int, maxtime:float, allstr:int, checkcycle:int, script="lasp_ssw.script"):
+    def run(self,njob:int ,ncycle:int, nbadneed:int, maxtime:float, allstr:int, checkcycle:int, script="lasp_ssw.script", queue="slurm"):
         '''main SSW running func on local processing
         
         Args:
@@ -145,6 +146,7 @@ class RunSSW:
             maxtime: running maxtime
             allstr: str status?
             checkcycle: SSWcheckcycle in console
+            queue: slurm or other(PBS, LSF)
             
         Returns:
             nbad: structures for iter-NN-training
@@ -167,6 +169,7 @@ class RunSSW:
             # adjust Ncore to fit the atom numbers of structure: why?
             shutil.copy(script, workdirs[i])
             os.chdir(workdirs[i])
+            # for slurm; other should be specified
             command = "sbatch -J %s %s"%(workdirs[i], script)
             # use os.popen to get jobid
             jobids.append(int(os.popen(command).readline().strip().split()[-1]))
@@ -349,20 +352,21 @@ class RunVASP:
            
             # for VASP-DFT we need POSCAR(not necc in lasp-vasp) and POTCAR
             # should put atom POTCAR in VASP/sourcedir
-            AllStr[i].outPOSCAR('POSCAR_%d'%i)
-            AllStr[i].genPOTCAR('../sourcedir/','POTCAR_%d'%i)
+            struc = AllStr[i]
+            struc.outPOSCAR('POSCAR_%d'%i)
+            struc.genPOTCAR('../sourcedir/','POTCAR_%d'%i)
 
             # self.prog=para['prog']['VASP']
             # for molecular, automatically use VASPgamma
             # others use pre-KPOINTS
             # get KPOINTS (from prepared sourcedir) 
-            if AllStr[i].abc[0]== AllStr[i].abc[1] and \
-               AllStr[i].abc[1]==AllStr[i].abc[2] and \
-               AllStr[i].abc[1] > 9.99 :
+            if struc.abc[0]== struc.abc[1] and \
+               struc.abc[1]==struc.abc[2] and \
+               struc.abc[1] > 9.99 :
                 os.system('\cp  ../sourcedir/KPOINTS_gamma  para%d/KPOINTS'%(i+1))
                 self.prog=para['prog']['VASPgamma']
             else:
-                AllStr[i].genKPOINTS('KPOINTS')
+                struc.genKPOINTS('KPOINTS')
                 os.system('mv KPOINTS para%d/'%(i+1))
             # I write a Allstr.genkpoints -- JamesBourbon
             # but still can directly copy KPOINTS: use mesh auto 25
@@ -422,10 +426,11 @@ class RunVASP:
 
 
         # collect data
+        nstr = len(AllStr)
         print('---------Start collect data---------')
-        self.collect_data(ncycle,len(AllStr)) # give labeled TrainStr and TrainFor
+        self.collect_data(ncycle, nstr) # give labeled TrainStr and TrainFor
         #if(Lallstr==0): self.compare(ncycle)
-        self.compare(ncycle)
+        self.compare(ncycle, nstr)
         # self.screen_data('1.arc',forcefile ='2.arc')
         naddstr = int(os.popen("grep Energy TrainStr.txt -c").readline().strip())
         # update Coordination Patterns Database if set it
@@ -443,27 +448,46 @@ class RunVASP:
         return naddstr
 
 
-    def compare(self,ncycle):
+    def compare(self,ncycle, nstr=1):
         '''compare NN_single and VASP-DFT result to get RMSE
             aimed to judge NN_train can finish or not 
         
-        noted by JamesBourbon in 20220317
+        updated by JamesBourbon in 20230517
         '''
         # before VASP
         nn = AllStr_new()
-        nn.readfile('allstr.arc-%d'%ncycle)
+        nn.read_arc('allstr.arc-%d'%ncycle)
         # After VASP
         vasp = AllStr_new()
-        vasp.readfile('allstr.arc')
+        vasp.read_arc('allstr.arc')
         # compare energy
         if (len(nn)!= len(vasp)):
-            print('some str failed to dft cal')
+            print('--- some str failed to dft cal, collect and calculate converged str ---')
+            for i in range(nstr):
+                if glob.glob('para%d/TrainStr.txt'%(i+1)):
+                    os.system("cat para%d/lasp.str >> allstr_ini_converged.arc"%(i+1))
+                    os.system("cat para%d/allstr.arc >> allstr_final_converged.arc"%(i+1))
+            nn = AllStr_new()
+            nn.read_arc('allstr_ini_converged.arc')
+            vasp = AllStr_new()
+            vasp.read_arc('allstr_final_converged.arc')
+            err_all = 0
+            for i in range(len(nn)):
+                err_all=err_all+np.square(nn[i].energy-vasp[i].energy)
+            rmse= np.sqrt(err_all/len(nn))
+            print('----------- RMSE %14.8f eV ---------'%rmse)
+            os.system('echo "----- Done Calculation for %d cycle on %d structures ! -----" >> VASP_part.log'%ncycle, nstr)
+            os.system('echo "----------- RMSE %14.8f eV ---------" >> VASP_part.log'%rmse)
+            os.system('echo "----------- Some structures Failed to DFT cal ! ---------" >> VASP_part.log')
         else :
             err_all = 0
             for i in range(len(nn)):
                 err_all=err_all+np.square(nn[i].energy-vasp[i].energy)
             rmse= np.sqrt(err_all/len(nn))
-            print('----------- rmsE %14.8f eV ---------'%rmse)
+            print('----------- RMSE %14.8f eV ---------'%rmse)
+            os.system('echo "----- Done Calculation for %d cycle on %d structures ! -----" >> VASP_part.log'%ncycle, nstr)
+            os.system('echo "----------- RMSE %14.8f eV ---------" >> NNtrain.log'%rmse)
+            os.system('echo "----------- All structures Successed to DFT cal ! ---------" >> VASP_part.log')
 
 
     def collect_data(self,ncycle:int,nstr:int):
@@ -504,9 +528,9 @@ class RunVASP:
         '''        
         AllStr = AllStr_new()
         if forcefile:
-            AllStr.arcinit([0,0],strfile,forcefile)
+            AllStr.read_arc(strfile,forcefile)
         else :
-            AllStr.arcinit([0,0],strfile)
+            AllStr.read_arc(strfile)
         # Here can set HighE,MaxAngle,MinAngle
         if len(AllStr)==0: return
         # for screen structure/force data

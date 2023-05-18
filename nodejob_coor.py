@@ -21,7 +21,7 @@ def collect_allstr(workdir,nbadneed):
     # volume give a larger choosing space
     print("collect allstr from SSW nodejob_coor.py")
     AllStr = AllStr_new()
-    AllStr.arcinit([0,0],'%s/allstr.arc'%(workdir)) 
+    AllStr.read_arc('%s/allstr.arc'%(workdir)) 
     AllStrGot = AllStr_new() 
     str_count = len(AllStr)
     out_file = '%s/outstr.arc'%workdir

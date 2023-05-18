@@ -17,7 +17,7 @@ def lasp2extxyz(strname, forname, filetype=1):
     '''
     allstr = AllStr()
     if filetype==0 or strname[-4:] == '.arc':
-        allstr.arcinit([0,0], strname, forname)
+        allstr.read_arc( strname, forname)
     elif filetype==1 or strname[-4:] == '.txt':
         allstr.train_data_init(strname, forname)
     else:

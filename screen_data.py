@@ -16,9 +16,9 @@ def screen_data(strfile, forcefile, nmax = 999999, maxF=10):
     '''        
     AllStr = AllStr_new()
     if forcefile:
-        AllStr.arcinit([0,0],strfile,forcefile)
+        AllStr.read_arc(strfile,forcefile)
     else :
-        AllStr.arcinit([0,0],strfile)
+        AllStr.read_arc(strfile)
     # Here can set HighE,MaxAngle,MinAngle
     if len(AllStr)==0: return
     # for screen structure/force data

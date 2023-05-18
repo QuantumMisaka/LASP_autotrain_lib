@@ -10,7 +10,7 @@ from allstr_new import AllStr as AllStr_new
 def split(arcfile, paradir='', workname="para"):
     ROOTDIR = os.getcwd()
     AllStr = AllStr_new() 
-    AllStr.arcinit([0,0],arcfile)
+    AllStr.read_arc(arcfile)
     str_count = len(AllStr)
     for i in range(str_count):
         if paradir and os.path.isdir(paradir):

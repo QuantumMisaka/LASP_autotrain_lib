@@ -1,18 +1,17 @@
 #!/bin/bash
 #SBATCH -J para
-#SBATCH -p g1_user
+#SBATCH -p C064M0256G
 #SBATCH --nodes=1
 ##SBATCH --time=72:00:00 
-#SBATCH --ntasks-per-node=56
+#SBATCH --ntasks-per-node=64
 #SBATCH --error=%J.err          ###err log###
 #SBATCH --output=%J.out         ###out log###
 
-unset I_MPI_PMI_LIBRARY
-export I_MPI_JOB_RESPECT_PROCESS_PLACEMENT=0
+# for use auto.py in Weiming NO.2
 
-source /es01/software/profile.d/intel2020.sh
+module load vasp/6.2.0-Ts-Sol
 
-mpirun -np $SLURM_NPROCS  ~/apps/vasp/6.2/TS-Sol/vasp_std
+mpirun vasp_std
 
 scontrol show job $SLURM_JOBID
 
