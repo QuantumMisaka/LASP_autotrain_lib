@@ -7,12 +7,12 @@
 #SBATCH --error=%J.err          ###err log###
 #SBATCH --output=%J.out         ###out log###
 
+# for weiming HPC
+
 module load LASP
 
 EXEC=lasp
 mpirun $EXEC
-
-
 
 scontrol show job $SLURM_JOBID
 

@@ -7,6 +7,7 @@
 #SBATCH --error=NN_%J.err          ###err log###
 #SBATCH --output=NN_%J.out         ###out log###
 
+# for Weiming HPC
 module load LASP
 
 # gen machinefile
@@ -15,7 +16,6 @@ srun hostname -s | sort -n > slurm.hosts
 EXEC=lasp 
 
 mpirun -machinefile slurm.hosts $EXEC
-
 
 scontrol show job $SLURM_JOBID
 
