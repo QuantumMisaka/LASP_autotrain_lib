@@ -8,7 +8,7 @@ from allstr_new import AllStr
 def lasp2extxyz(strname, forname, filetype=1):
     '''
     lasp allstr.arc/allfor.arc or TrainStr.txt/TrainFor.txt 
-    to REANN
+    to extxyz for ASE and Nequip
 
     Inputs:
         strname: input str file (.arc or .txt will be identified)
